@@ -36,138 +36,108 @@ object AppColors {
 @Composable
 fun WelcomeScreen(onSkip: () -> Unit) {
     Surface(color = AppColors.surface, modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(onClick = onSkip) {
-                Text("Skip", color = AppColors.primary)
-            }
-        }
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top section with Icon and App Name
-            Spacer(modifier = Modifier.weight(0.5f))
-            Icon(
-                imageVector = Icons.Default.School,
-                contentDescription = "AiLearner Logo",
-                tint = AppColors.primary,
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "AiLearner",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = AppColors.textPrimary
-            )
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Bottom section with headline, buttons, and legal text
-            Box(
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Skip button at top-right
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(2f)
-                    .background(
-                        AppColors.background,
-                        // This creates a rounded top shape, simulating the wave
-                        shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)
-                    )
+                    .padding(16.dp)
+                    .align(Alignment.TopEnd),
+                horizontalArrangement = Arrangement.End
             ) {
-                Column(
+                TextButton(onClick = onSkip) {
+                    Text("Skip", color = AppColors.primary)
+                }
+            }
+
+            // Main content
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.weight(0.5f))
+                Icon(
+                    imageVector = Icons.Default.School,
+                    contentDescription = "AiLearner Logo",
+                    tint = AppColors.primary,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "AiLearner",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.textPrimary
+                )
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .weight(2f)
+                        .background(
+                            AppColors.background,
+                            shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)
+                        )
                 ) {
-                    Text(
-                        text = "Learn Anything.\nFaster. Smarter.",
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.textPrimary,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 40.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "AI helps you generate personalized courses in seconds.",
-                        fontSize = 16.sp,
-                        color = AppColors.textSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(
-                        onClick = { /* Navigate to Get Started */ },
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.darkButton)
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Get Started", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "Learn Anything.\nFaster. Smarter.",
+                            fontSize = 34.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AppColors.textPrimary,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 40.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "AI helps you generate personalized courses in seconds.",
+                            fontSize = 16.sp,
+                            color = AppColors.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { /* Navigate to Get Started */ },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.darkButton)
+                        ) {
+                            Text("Get Started", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = { /* Navigate to Log In */ },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(AppColors.textSecondary)
+                            )
+                        ) {
+                            Text(
+                                "I Have an Account",
+                                fontSize = 18.sp,
+                                color = AppColors.textPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedButton(
-                        onClick = { /* Navigate to Log In */ },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(AppColors.textSecondary))
-                    ) {
-                        Text("I Have an Account", fontSize = 18.sp, color = AppColors.textPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    LegalText()
                 }
             }
         }
     }
 }
-
-@Composable
-fun LegalText() {
-    // buildAnnotatedString allows for different styles within a single Text composable.
-    val annotatedString = buildAnnotatedString {
-        withStyle(style = SpanStyle(color = AppColors.textSecondary, fontSize = 12.sp)) {
-            append("By continuing, you agree to our ")
-        }
-        pushStringAnnotation(tag = "TOS", annotation = "https://example.com/terms")
-        withStyle(style = SpanStyle(color = AppColors.primary, fontSize = 12.sp)) {
-            append("Terms of Service")
-        }
-        pop()
-        withStyle(style = SpanStyle(color = AppColors.textSecondary, fontSize = 12.sp)) {
-            append(" and ")
-        }
-        pushStringAnnotation(tag = "PP", annotation = "https://example.com/privacy")
-        withStyle(style = SpanStyle(color = AppColors.primary, fontSize = 12.sp)) {
-            append("Privacy Policy")
-        }
-        pop()
-    }
-
-    ClickableText(
-        text = annotatedString,
-        onClick = { offset ->
-            // Handle clicks on the annotated parts of the text
-            annotatedString.getStringAnnotations(tag = "TOS", start = offset, end = offset)
-                .firstOrNull()?.let {
-                    // Open Terms of Service URL
-                }
-            annotatedString.getStringAnnotations(tag = "PP", start = offset, end = offset)
-                .firstOrNull()?.let {
-                    // Open Privacy Policy URL
-                }
-        },
-        style = LocalTextStyle.current.copy(textAlign = TextAlign.Center)
-    )
-}
-
 
 @Preview(showBackground = true, device = "id:pixel_4")
 @Composable
@@ -176,4 +146,3 @@ fun WelcomeScreenPreview() {
         WelcomeScreen(onSkip={})
     }
 }
-o
