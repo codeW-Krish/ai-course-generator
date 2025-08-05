@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Jet pack demo</string>
+    <string name="title_activity_welcome_screen.kt">WelcomeScreen.kt</string>
+</resources>
