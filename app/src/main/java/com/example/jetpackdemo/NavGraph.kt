@@ -4,19 +4,49 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.jetpackdemo.ui.theme.AppColors // Import the central theme
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
     NavHost(navController = navController, startDestination = "welcome") {
         composable("welcome") {
-            WelcomeScreen(onSkip = {
-                navController.navigate("home") {
-                    popUpTo("welcome") { inclusive = true } // Clears back stack
-                }
-            })
+            WelcomeScreen(
+                onGetStarted = { navController.navigate("signup") },
+                onLogin = { navController.navigate("login") }
+            )
+        }
+        composable("signup") {
+            SignUpScreen(
+                onSignUpSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("welcome") { inclusive = true } // Clear back stack to prevent going back to auth flow
+                    }
+                },
+                onLoginClicked = { navController.navigate("login") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("welcome") { inclusive = true } // Clear back stack
+                    }
+                },
+                onSignUpClicked = { navController.navigate("signup") },
+                onBack = { navController.popBackStack() }
+            )
         }
         composable("home") {
-            HomeScreen()
+            // Pass a lambda to handle the FAB click navigation
+            HomeScreen(
+                onCreateCourseClicked = { navController.navigate("create_course") }
+            )
+        }
+        composable("create_course") {
+            CreateCourseScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }
