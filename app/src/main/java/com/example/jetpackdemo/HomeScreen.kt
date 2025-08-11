@@ -1,6 +1,5 @@
 package com.example.jetpackdemo
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,15 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-// Define a modern color palette
-
+import com.example.jetpackdemo.ui.theme.AppColors
 
 // Data classes to represent the UI models
 data class Course(
@@ -43,16 +38,16 @@ data class DiscoverCourse(
     val instructorImage: Int // Using drawable resource ID
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
-    // Scaffold provides a standard layout structure for material design apps.
+fun HomeScreen(onCreateCourseClicked: () -> Unit) {
     Scaffold(
         containerColor = AppColors.background,
         topBar = { HomeTopBar() },
         bottomBar = { HomeBottomNavigation() },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* Handle Create Course click */ },
+                onClick = onCreateCourseClicked,
                 containerColor = AppColors.primary,
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -60,15 +55,14 @@ fun HomeScreen() {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Course", tint = Color.White)
+                    Icon(Icons.Default.Add, contentDescription = "Create Course", tint = AppColors.onPrimary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Create Course", color = Color.White)
+                    Text("Create Course", color = AppColors.onPrimary)
                 }
             }
         },
-        floatingActionButtonPosition = FabPosition.Center
+        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
-        // LazyColumn is used for vertically scrolling lists.
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,7 +82,6 @@ fun HomeScreen() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeTopBar() {
-    // TopAppBar for the top section of the screen.
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -102,7 +95,7 @@ fun HomeTopBar() {
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.background)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )
 }
 
@@ -116,7 +109,6 @@ fun YourCoursesSection() {
 
     Column {
         SectionHeader(title = "Your Courses")
-        // LazyRow for horizontally scrolling lists.
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 8.dp)
@@ -145,11 +137,8 @@ fun CourseProgressCard(course: Course) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LinearProgressIndicator(
                     progress = { course.progress },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(8.dp)
-                        .clip(CircleShape),
-                    color = AppColors.primary,
+                    modifier = Modifier.weight(1f).height(8.dp).clip(CircleShape),
+                    color = AppColors.accent,
                     trackColor = AppColors.background
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -162,7 +151,7 @@ fun CourseProgressCard(course: Course) {
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Continue")
+                Text("Continue", color = AppColors.onPrimary)
             }
         }
     }
@@ -170,7 +159,6 @@ fun CourseProgressCard(course: Course) {
 
 @Composable
 fun DiscoverCoursesSection() {
-    // Dummy data for discoverable courses
     val discoverCourses = listOf(
         DiscoverCourse("Natural Language Processing", "Alex Morgan", "2,458 students", "AI", "Beginner", 0),
         DiscoverCourse("React.js for AI Applications", "Sarah Johnson", "1,872 students", "Web", "Intermediate", 0),
@@ -195,12 +183,7 @@ fun DiscoverCourseCard(course: DiscoverCourse) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            // In a real app, you would load this image from a URL.
-            // Image(painter = painterResource(id = R.drawable.ic_launcher_background), ...)
-            Box(modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(AppColors.background))
+            Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(AppColors.background))
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -223,9 +206,10 @@ fun DiscoverCourseCard(course: DiscoverCourse) {
             OutlinedButton(
                 onClick = { /* Handle Join */ },
                 shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.primary),
                 border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(AppColors.primary))
             ) {
-                Text("Join", color = AppColors.primary)
+                Text("Join")
             }
         }
     }
@@ -235,14 +219,12 @@ fun DiscoverCourseCard(course: DiscoverCourse) {
 @Composable
 fun SectionHeader(title: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
-        Text("See all", fontSize = 14.sp, color = AppColors.primary, fontWeight = FontWeight.SemiBold)
+        Text("See all", fontSize = 14.sp, color = AppColors.accent, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -250,7 +232,7 @@ fun SectionHeader(title: String) {
 fun Chip(text: String) {
     Box(
         modifier = Modifier
-            .background(AppColors.chipBackground, RoundedCornerShape(8.dp))
+            .background(AppColors.accent.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(text, color = AppColors.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -259,7 +241,6 @@ fun Chip(text: String) {
 
 @Composable
 fun HomeBottomNavigation() {
-    // Bottom navigation bar
     NavigationBar(
         containerColor = AppColors.surface,
         tonalElevation = 8.dp
@@ -269,7 +250,6 @@ fun HomeBottomNavigation() {
             BottomNavItem("Progress", Icons.Default.ShowChart),
             BottomNavItem("Profile", Icons.Default.Person)
         )
-        // A selected state would be managed by a ViewModel in a real app
         val selectedItem = items[0]
 
         items.forEach { item ->
@@ -283,7 +263,7 @@ fun HomeBottomNavigation() {
                     unselectedIconColor = AppColors.textSecondary,
                     selectedTextColor = AppColors.primary,
                     unselectedTextColor = AppColors.textSecondary,
-                    indicatorColor = AppColors.chipBackground
+                    indicatorColor = AppColors.accent.copy(alpha = 0.15f)
                 )
             )
         }
@@ -295,7 +275,5 @@ data class BottomNavItem(val title: String, val icon: ImageVector)
 @Preview(showBackground = true, device = "id:pixel_4")
 @Composable
 fun HomeScreenPreview() {
-    MaterialTheme {
-        HomeScreen();
-    }
+    HomeScreen({})
 }
