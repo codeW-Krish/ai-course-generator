@@ -8,9 +8,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,9 +22,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.jetpackdemo.ui.theme.AppColors
 
-// Data classes to represent the UI models
+// --- Data Models ---
 data class Course(
     val title: String,
     val lessonCount: Int,
@@ -35,25 +44,68 @@ data class DiscoverCourse(
     val studentCount: String,
     val tag: String,
     val level: String,
-    val instructorImage: Int // Using drawable resource ID
+    val instructorImage: Int
 )
 
+data class BottomNavItem(val title: String, val route: String, val icon: ImageVector)
+
+
+// --- Main Screen with Bottom Navigation ---
+@Composable
+fun MainScreen(navController: NavHostController) {
+    val bottomBarNavController = rememberNavController()
+    Scaffold(
+        bottomBar = { HomeBottomNavigation(navController = bottomBarNavController) }
+    ) { paddingValues ->
+        Box(modifier = Modifier.padding(paddingValues)) {
+            BottomNavGraph(
+                bottomBarNavController = bottomBarNavController,
+                appNavController = navController
+            )
+        }
+    }
+}
+
+// --- Navigation Graph for the Bottom Bar Tabs ---
+@Composable
+fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: NavHostController) {
+    NavHost(navController = bottomBarNavController, startDestination = "home") {
+        composable("home") {
+            HomeScreen(
+                onCreateCourseClicked = { appNavController.navigate("create_course") }
+            )
+        }
+        composable("progress") {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Progress Screen")
+            }
+        }
+        composable("profile") {
+            UserProfileScreen(navController = appNavController)
+        }
+    }
+}
+
+
+// --- Simplified HomeScreen (Content Only) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(onCreateCourseClicked: () -> Unit) {
     Scaffold(
         containerColor = AppColors.background,
         topBar = { HomeTopBar() },
-        bottomBar = { HomeBottomNavigation() },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateCourseClicked,
                 containerColor = AppColors.primary,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
             ) {
                 Row(
+
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+
                     verticalAlignment = Alignment.CenterVertically
+
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Create Course", tint = AppColors.onPrimary)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -61,7 +113,7 @@ fun HomeScreen(onCreateCourseClicked: () -> Unit) {
                 }
             }
         },
-        floatingActionButtonPosition = FabPosition.End
+        floatingActionButtonPosition = FabPosition.End // Centered FAB
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -79,6 +131,52 @@ fun HomeScreen(onCreateCourseClicked: () -> Unit) {
     }
 }
 
+
+// --- Updated Bottom Navigation Bar ---
+// --- Updated Bottom Navigation Bar ---
+@Composable
+fun HomeBottomNavigation(navController: NavHostController) {
+    val items = listOf(
+        BottomNavItem("Home", "home", Icons.Default.Home),
+        BottomNavItem("Progress", "progress", Icons.AutoMirrored.Filled.ShowChart), // Use the AutoMirrored version
+        BottomNavItem("Profile", "profile", Icons.Default.Person)
+    )
+
+    NavigationBar(
+        containerColor = AppColors.surface,
+        tonalElevation = 8.dp
+    ) {
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentDestination = navBackStackEntry?.destination
+
+        items.forEach { item ->
+            NavigationBarItem(
+                icon = { Icon(item.icon, contentDescription = item.title) },
+                label = { Text(item.title) },
+                selected = currentDestination?.hierarchy?.any { it.route == item.route } == true,
+                onClick = {
+                    navController.navigate(item.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = AppColors.primary,
+                    unselectedIconColor = AppColors.textSecondary,
+                    selectedTextColor = AppColors.primary,
+                    unselectedTextColor = AppColors.textSecondary,
+                    indicatorColor = AppColors.primary.copy(alpha = 0.1f)
+                )
+            )
+        }
+    }
+}
+
+
+// --- Other Composables for HomeScreen ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeTopBar() {
@@ -138,7 +236,7 @@ fun CourseProgressCard(course: Course) {
                 LinearProgressIndicator(
                     progress = { course.progress },
                     modifier = Modifier.weight(1f).height(8.dp).clip(CircleShape),
-                    color = AppColors.accent,
+                    color = AppColors.progressGreen,
                     trackColor = AppColors.background
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -232,48 +330,15 @@ fun SectionHeader(title: String) {
 fun Chip(text: String) {
     Box(
         modifier = Modifier
-            .background(AppColors.accent.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+            .background(AppColors.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(text, color = AppColors.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
+@Preview(showBackground = true)
 @Composable
-fun HomeBottomNavigation() {
-    NavigationBar(
-        containerColor = AppColors.surface,
-        tonalElevation = 8.dp
-    ) {
-        val items = listOf(
-            BottomNavItem("Home", Icons.Default.Home),
-            BottomNavItem("Progress", Icons.Default.ShowChart),
-            BottomNavItem("Profile", Icons.Default.Person)
-        )
-        val selectedItem = items[0]
-
-        items.forEach { item ->
-            NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.title) },
-                label = { Text(item.title) },
-                selected = selectedItem == item,
-                onClick = { /* Handle navigation */ },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = AppColors.primary,
-                    unselectedIconColor = AppColors.textSecondary,
-                    selectedTextColor = AppColors.primary,
-                    unselectedTextColor = AppColors.textSecondary,
-                    indicatorColor = AppColors.accent.copy(alpha = 0.15f)
-                )
-            )
-        }
-    }
-}
-
-data class BottomNavItem(val title: String, val icon: ImageVector)
-
-@Preview(showBackground = true, device = "id:pixel_4")
-@Composable
-fun HomeScreenPreview() {
-    HomeScreen({})
+fun MainScreenPreview() {
+    MainScreen(navController = rememberNavController())
 }

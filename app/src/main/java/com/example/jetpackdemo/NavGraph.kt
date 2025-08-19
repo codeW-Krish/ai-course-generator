@@ -9,6 +9,7 @@ import com.example.jetpackdemo.ui.theme.AppColors // Import the central theme
 @Composable
 fun AppNavGraph(navController: NavHostController) {
     NavHost(navController = navController, startDestination = "welcome") {
+        // --- Authentication Flow ---
         composable("welcome") {
             WelcomeScreen(
                 onGetStarted = { navController.navigate("signup") },
@@ -16,35 +17,40 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
         composable("signup") {
-            SignUpScreen(
-                onSignUpSuccess = {
-                    navController.navigate("home") {
-                        popUpTo("welcome") { inclusive = true } // Clear back stack to prevent going back to auth flow
-                    }
-                },
-                onLoginClicked = { navController.navigate("login") },
-                onBack = { navController.popBackStack() }
-            )
+            // Updated to pass the NavController
+            SignUpScreen(navController = navController)
         }
         composable("login") {
-            LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate("home") {
-                        popUpTo("welcome") { inclusive = true } // Clear back stack
-                    }
-                },
-                onSignUpClicked = { navController.navigate("signup") },
-                onBack = { navController.popBackStack() }
-            )
+            // Updated to pass the NavController
+            LoginScreen(navController = navController)
         }
-        composable("home") {
-            // Pass a lambda to handle the FAB click navigation
-            HomeScreen(
-                onCreateCourseClicked = { navController.navigate("create_course") }
-            )
+
+
+        // --- Main App Screen (with bottom navigation) ---
+        composable("main") {
+            // Pass the main NavController to the MainScreen
+            MainScreen(navController = navController)
         }
+
+        // --- Course Creation Flow (navigated to from Home) ---
         composable("create_course") {
             CreateCourseScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onGenerateOutline = {
+                    navController.navigate("course_outline")
+                }
+            )
+        }
+        composable("course_outline") {
+            CourseOutlineScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onGenerateContent = {
+                    navController.navigate("course_content")
+                }
+            )
+        }
+        composable("course_content") {
+            CourseContentScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
