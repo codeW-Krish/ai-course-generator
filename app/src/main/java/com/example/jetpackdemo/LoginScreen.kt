@@ -1,11 +1,16 @@
 package com.example.jetpackdemo
 
+import android.util.Log
+import android.util.Patterns
+import org.json.JSONObject
+
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -14,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -25,14 +31,25 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
+import com.example.jetpackdemo.data.api.RetrofitClient
+import com.example.jetpackdemo.data.model.LoginRequest
 import com.example.jetpackdemo.ui.theme.AppColors
+import com.example.jetpackdemo.utils.TokenManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, onSignUpClicked: () -> Unit, onBack: () -> Unit) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+fun LoginScreen(navController: NavHostController) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val tokenManager = remember { TokenManager(context) }
 
     Scaffold(
         containerColor = AppColors.background,
@@ -40,8 +57,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSignUpClicked: () -> Unit, onBack:
             TopAppBar(
                 title = { },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppColors.textPrimary)
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = AppColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -56,19 +73,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSignUpClicked: () -> Unit, onBack:
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                "Welcome Back!",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = AppColors.textPrimary
-            )
-            Text(
-                "Log in to continue your learning journey.",
-                fontSize = 16.sp,
-                color = AppColors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
-            )
+            Text("Welcome Back!", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
+            Text("Log in to continue your learning journey.", fontSize = 16.sp, color = AppColors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 32.dp))
 
             OutlinedTextField(
                 value = email,
@@ -77,13 +83,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSignUpClicked: () -> Unit, onBack:
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AppColors.primary,
-                    unfocusedBorderColor = AppColors.textSecondary.copy(alpha = 0.5f),
-                    focusedLabelColor = AppColors.primary,
-                    cursorColor = AppColors.primary
-                )
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -100,27 +100,65 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSignUpClicked: () -> Unit, onBack:
                         Icon(imageVector = image, contentDescription = null, tint = AppColors.textSecondary)
                     }
                 },
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AppColors.primary,
-                    unfocusedBorderColor = AppColors.textSecondary.copy(alpha = 0.5f),
-                    focusedLabelColor = AppColors.primary,
-                    cursorColor = AppColors.primary
-                )
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(32.dp))
             Button(
-                onClick = onLoginSuccess,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = {
+                    // Basic Validation
+                    if (email.isBlank() || password.isBlank()) {
+                        Toast.makeText(context, "Email and password cannot be empty.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                        Toast.makeText(context, "Please enter a valid email address.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    isLoading = true
+                    scope.launch {
+                        try {
+                            val response = RetrofitClient.publicApi.login(LoginRequest(email, password))
+
+                            if (response.isSuccessful) {
+                                val body = response.body()!!
+                                tokenManager.saveTokens(body.accessToken, body.refreshToken)
+                                navController.navigate("main") {
+                                    popUpTo("welcome") { inclusive = true }
+                                }
+                            } else {
+                                val errorBody = response.errorBody()?.string()
+                                val errorMessage = parseErrorMessage(errorBody)
+                                Toast.makeText(context, "Login failed: $errorMessage", Toast.LENGTH_LONG).show()
+                            }
+
+                        } catch (e: Exception) {
+                            e.message?.let { Log.e("KEY_LOGIN_FAILED", it) };
+                            Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
+                enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
             ) {
-                Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = AppColors.onPrimary)
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = AppColors.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = AppColors.onPrimary)
+                }
             }
             Spacer(modifier = Modifier.height(24.dp))
-            SignUpNavigation(onSignUpClicked)
+            SignUpNavigation {
+                navController.navigate("signup")
+            }
         }
     }
 }
@@ -145,9 +183,18 @@ private fun SignUpNavigation(onSignUpClicked: () -> Unit) {
         }
     )
 }
+fun parseErrorMessage(errorBody: String?): String {
+    return try {
+        val json = org.json.JSONObject(errorBody ?: return "Unknown error")
+        json.getString("error") ?: "Unknown error"
+    } catch (e: Exception) {
+        "Something went wrong"
+    }
+}
+
 
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
-    LoginScreen({}, {}, {})
+    LoginScreen(rememberNavController())
 }

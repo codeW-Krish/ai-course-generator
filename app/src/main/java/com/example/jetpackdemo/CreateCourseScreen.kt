@@ -21,7 +21,7 @@ import com.example.jetpackdemo.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateCourseScreen(onNavigateBack: () -> Unit) {
+fun CreateCourseScreen(onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit) {
     var courseTitle by remember { mutableStateOf("") }
     var courseDescription by remember { mutableStateOf("") }
     var includeYouTube by remember { mutableStateOf(false) }
@@ -69,7 +69,7 @@ fun CreateCourseScreen(onNavigateBack: () -> Unit) {
                         .padding(16.dp)
                 ) {
                     Button(
-                        onClick = { /* Handle Generate Outline */ },
+                        onClick = onGenerateOutline ,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -241,5 +241,5 @@ private fun getTextFieldColors(): TextFieldColors {
 @Preview(showBackground = true, device = "id:pixel_4")
 @Composable
 fun CreateCourseScreenPreview() {
-    CreateCourseScreen(onNavigateBack = {})
+    CreateCourseScreen(onNavigateBack = {}, onGenerateOutline = {})
 }
