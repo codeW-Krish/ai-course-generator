@@ -77,3 +77,51 @@ data class Subtopic(
     val position: Int
 )
 
+data class GeneratedSubtopicContent(
+    @SerializedName("subtopic_title")
+    val subtopicTitle: String,
+
+    val title: String,
+
+    @SerializedName("why_this_matters")
+    val whyThisMatters: String,
+
+    @SerializedName("core_concepts")
+    val coreConcepts: List<CoreConcept>,
+
+    val examples: List<Example>,
+
+    @SerializedName("code_or_math")
+    val codeOrMath: String?, // nullable, can be null
+
+    @SerializedName("youtube_keywords")
+    val youtubeKeywords: List<String>
+)
+
+data class CoreConcept(
+    val concept: String,
+    val explanation: String
+)
+
+data class Example(
+    val type: String, // e.g. "analogy", "technical_example"
+    val content: String
+)
+
+data class GenerationStatusResponse(
+    val courseId: String,
+    val status: String,               // e.g., "failed", "completed"
+    val totalSubtopics: Int?,         // nullable
+    val generatedSubtopics: Int,
+    val lastUpdated: String,           // ISO timestamp
+    val subtopics: List<GeneratedSubtopic>  // list of generated subtopic details
+)
+
+data class GeneratedSubtopic(
+    val id: String,
+    val title: String,
+    val content: GeneratedSubtopicContent,  // nested JSON object (not a String)
+    val content_generated_at: String,
+    val unit_title: String
+)
+

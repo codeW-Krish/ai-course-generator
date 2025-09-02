@@ -6,6 +6,8 @@ import com.example.jetpackdemo.data.model.CoursesResponse
 import com.example.jetpackdemo.data.model.EnrollResponse
 import com.example.jetpackdemo.data.model.GenerateOutlineRequest
 import com.example.jetpackdemo.data.model.GenerateOutlineResponse
+import com.example.jetpackdemo.data.model.GeneratedSubtopicContent
+import com.example.jetpackdemo.data.model.GenerationStatusResponse
 import com.example.jetpackdemo.data.model.LoginRequest
 import com.example.jetpackdemo.data.model.RefreshRequest
 import com.example.jetpackdemo.data.model.RefreshResponse
@@ -60,6 +62,14 @@ interface ApiService {
     // Generate Outline
     @POST("/api/courses/generate-outline")
     suspend fun generateOutline(@Body request: GenerateOutlineRequest): Response<GenerateOutlineResponse>
+
+    // Generate Content
+    @POST("/api/courses/{id}/generate-content")
+    suspend fun generateContent(@Path("id") courseId: String): Response<GeneratedSubtopicContent>
+
+    // Get Generation Response
+    @GET("/api/courses/{id}/generation-status")
+    suspend fun getCourseGenerationStatus(@Path("id") courseId: String, @retrofit2.http.Query("since") since: String? = null): Response<GenerationStatusResponse>
 
     // GET all public courses
     @GET("/api/courses")
