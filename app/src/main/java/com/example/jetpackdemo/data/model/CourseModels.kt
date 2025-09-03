@@ -12,7 +12,9 @@ data class GenerateOutlineRequest(
     val numUnits: Int,
     val difficulty: String,
     @SerializedName("include_youtube")
-    val includeVideos: Boolean
+    val includeVideos: Boolean,
+    val provider: String = "Gemini",
+    val model: String? = null
 )
 
 // --- Response Body from Outline Generation ---
