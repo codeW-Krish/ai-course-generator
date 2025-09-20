@@ -1,7 +1,9 @@
 package com.example.jetpackdemo.data.api
 
 import com.example.jetpackdemo.data.model.AuthResponse
+import com.example.jetpackdemo.data.model.ContentGenerationStatusResponse
 import com.example.jetpackdemo.data.model.CourseFullResponse
+import com.example.jetpackdemo.data.model.CourseOutline
 import com.example.jetpackdemo.data.model.CoursesResponse
 import com.example.jetpackdemo.data.model.EnrollResponse
 import com.example.jetpackdemo.data.model.GenerateOutlineRequest
@@ -16,7 +18,9 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
 //    @POST("/api/auth/register")
@@ -63,9 +67,23 @@ interface ApiService {
     @POST("/api/courses/generate-outline")
     suspend fun generateOutline(@Body request: GenerateOutlineRequest): Response<GenerateOutlineResponse>
 
-    // Generate Content
+    // Update course outline by ID
+    @POST("/api/courses/{id}/outline/regenerate")
+    suspend fun updateCourseOutline(
+        @Path("id") courseId: String,
+        @Body outline: CourseOutline,
+        @Query("regenerate") regenerate: Boolean = false
+    ): Response<GenerateOutlineResponse> // or maybe just a status response — check backend return type
+
+
+    // Generate Content (triggers generation job)
     @POST("/api/courses/{id}/generate-content")
-    suspend fun generateContent(@Path("id") courseId: String): Response<GeneratedSubtopicContent>
+    suspend fun generateContent(
+        @Path("id") courseId: String,
+        @Query("provider") provider: String? = null,
+        @Query("model") model: String? = null
+    ): Response<ContentGenerationStatusResponse>
+
 
     // Get Generation Response
     @GET("/api/courses/{id}/generation-status")

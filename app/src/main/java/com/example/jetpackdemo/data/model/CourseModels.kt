@@ -3,7 +3,6 @@ package com.example.jetpackdemo.data.model
 import com.google.gson.annotations.SerializedName
 
 // --- Request Body for Outline Generation ---
-// This class matches the JSON request body that the app sends to the backend
 data class GenerateOutlineRequest(
     @SerializedName("course_title")
     val title: String,
@@ -18,8 +17,6 @@ data class GenerateOutlineRequest(
 )
 
 // --- Response Body from Outline Generation ---
-// These classes match the JSON the backend sends back to our app
-
 data class GenerateOutlineResponse(
     val courseId: String,
     val status: String,
@@ -29,7 +26,7 @@ data class GenerateOutlineResponse(
 data class CourseOutline(
     @SerializedName("course_title")
     val courseTitle: String,
-    val difficulty: String,
+    val difficulty: String?,
     val units: List<OutlineUnit>
 )
 
@@ -39,6 +36,7 @@ data class OutlineUnit(
     val subtopics: List<String>
 )
 
+// --- Course Management ---
 data class CoursesResponse(
     val courses: List<Course>
 )
@@ -48,16 +46,26 @@ data class Course(
     val title: String,
     val description: String?,
     val difficulty: String?,
-    val created_by: String,
-    val include_videos: Boolean,
-    val outline_json: Any?, // or a custom type
-    val created_at: String
+    @SerializedName("created_by")
+    val createdBy: String,
+    @SerializedName("include_videos")
+    val includeVideos: Boolean,
+    @SerializedName("outline_json")
+    val outlineJson: Any?, // can map to CourseOutline if always same shape
+    @SerializedName("created_at")
+    val createdAt: String
+)
+
+data class EnrollCourseRequest(
+    @SerializedName("course_id")
+    val courseId: String
 )
 
 data class EnrollResponse(
     val message: String
 )
 
+// --- Course Full Response with Units + Subtopics ---
 data class CourseFullResponse(
     val course: Course,
     val units: List<UnitWithSubtopics>
@@ -65,7 +73,8 @@ data class CourseFullResponse(
 
 data class UnitWithSubtopics(
     val id: String,
-    val course_id: String,
+    @SerializedName("course_id")
+    val courseId: String,
     val title: String,
     val position: Int,
     val subtopics: List<Subtopic>
@@ -73,12 +82,14 @@ data class UnitWithSubtopics(
 
 data class Subtopic(
     val id: String,
-    val unit_id: String,
+    @SerializedName("unit_id")
+    val unitId: String,
     val title: String,
     val content: String?,
     val position: Int
 )
 
+// --- Generated Subtopic Content (matches SubtopicContentSchema) ---
 data class GeneratedSubtopicContent(
     @SerializedName("subtopic_title")
     val subtopicTitle: String,
@@ -94,10 +105,10 @@ data class GeneratedSubtopicContent(
     val examples: List<Example>,
 
     @SerializedName("code_or_math")
-    val codeOrMath: String?, // nullable, can be null
+    val codeOrMath: String?, // nullable
 
     @SerializedName("youtube_keywords")
-    val youtubeKeywords: List<String>
+    val youtubeKeywords: List<String>?
 )
 
 data class CoreConcept(
@@ -106,24 +117,38 @@ data class CoreConcept(
 )
 
 data class Example(
-    val type: String, // e.g. "analogy", "technical_example"
+    val type: String, // "analogy" or "technical_example"
     val content: String
 )
 
+// --- Subtopic Batch Response (array of GeneratedSubtopicContent) ---
+typealias SubtopicBatchResponse = List<GeneratedSubtopicContent>
+
+// --- Content Generation Status ---
+data class ContentGenerationStatusResponse(
+    val message: String,
+    val units: Int,
+    @SerializedName("remaining_subtopics")
+    val remainingSubtopics: Int,
+    val status: String // "in_progress", "completed", etc.
+)
+
+// --- Background Generation Status (detailed tracking) ---
 data class GenerationStatusResponse(
     val courseId: String,
-    val status: String,               // e.g., "failed", "completed"
-    val totalSubtopics: Int?,         // nullable
+    val status: String,
+    val totalSubtopics: Int?,
     val generatedSubtopics: Int,
-    val lastUpdated: String,           // ISO timestamp
-    val subtopics: List<GeneratedSubtopic>  // list of generated subtopic details
+    val lastUpdated: String,
+    val subtopics: List<GeneratedSubtopic>
 )
 
 data class GeneratedSubtopic(
     val id: String,
     val title: String,
-    val content: GeneratedSubtopicContent,  // nested JSON object (not a String)
-    val content_generated_at: String,
-    val unit_title: String
+    val content: GeneratedSubtopicContent,
+    @SerializedName("content_generated_at")
+    val contentGeneratedAt: String,
+    @SerializedName("unit_title")
+    val unitTitle: String
 )
-

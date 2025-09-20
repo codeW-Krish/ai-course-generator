@@ -10,22 +10,25 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.jetpackdemo.ui.theme.AppColors
+import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateCourseScreen(onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit) {
+fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit
+) {
     var courseTitle by remember { mutableStateOf("") }
     var courseDescription by remember { mutableStateOf("") }
     var includeYouTube by remember { mutableStateOf(false) }
-
+    var numberOfUnits by remember { mutableStateOf(0) }
+    var difficultyLevel by remember { mutableStateOf("") }
     Scaffold(
         containerColor = AppColors.background,
         topBar = {
@@ -69,7 +72,16 @@ fun CreateCourseScreen(onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit
                         .padding(16.dp)
                 ) {
                     Button(
-                        onClick = onGenerateOutline ,
+                        onClick = {
+                            courseViewModel.prepareOutlineRequest(
+                                title = courseTitle,
+                                description = courseDescription,
+                                numUnits = numberOfUnits,
+                                difficulty = difficultyLevel,
+                                includeVideos = includeYouTube
+                            )
+                            onGenerateOutline()
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -141,7 +153,9 @@ fun CreateCourseScreen(onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit
             FormSection(label = "Number of Units", hint = "Choose how many units your course should have") {
                 DropdownSelector(
                     label = "Select unit count",
-                    items = listOf("3 Units", "4 Units", "5 Units", "6 Units", "7 Units", "8 Units")
+                    items = listOf("3 Units", "4 Units", "5 Units", "6 Units", "7 Units", "8 Units"),
+                    selectedText = "$numberOfUnits Units",
+                    onItemSelected = {  numberOfUnits = it.trim().split(" ").first().toInt() }
                 )
             }
 
@@ -149,7 +163,9 @@ fun CreateCourseScreen(onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit
             FormSection(label = "Difficulty Level", hint = "Set the appropriate difficulty level for your target audience") {
                 DropdownSelector(
                     label = "Select difficulty",
-                    items = listOf("Beginner", "Intermediate", "Advanced", "Expert")
+                    items = listOf("Beginner", "Intermediate", "Advanced", "Expert"),
+                    selectedText = difficultyLevel,
+                    onItemSelected = {difficultyLevel = it}
                 )
             }
 
@@ -184,10 +200,8 @@ fun FormSection(label: String, hint: String, content: @Composable () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownSelector(label: String, items: List<String>) {
+fun DropdownSelector(label: String, items: List<String>, selectedText: String, onItemSelected: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedText by remember { mutableStateOf(label) }
-
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
@@ -213,7 +227,7 @@ fun DropdownSelector(label: String, items: List<String>) {
                 DropdownMenuItem(
                     text = { Text(item) },
                     onClick = {
-                        selectedText = item
+                        onItemSelected(item)
                         expanded = false
                     }
                 )
@@ -237,9 +251,9 @@ private fun getTextFieldColors(): TextFieldColors {
     )
 }
 
-
-@Preview(showBackground = true, device = "id:pixel_4")
-@Composable
-fun CreateCourseScreenPreview() {
-    CreateCourseScreen(onNavigateBack = {}, onGenerateOutline = {})
-}
+//
+//@Preview(showBackground = true, device = "id:pixel_4")
+//@Composable
+//fun CreateCourseScreenPreview() {
+//    CreateCourseScreen(onNavigateBack = {}, ,onGenerateOutline = {})
+//}

@@ -73,11 +73,11 @@ private val allSubTopicContents = mapOf(
 )
 
 private val mockUnitsForContent = listOf(
-    UnitItem(1, "Unit 1: Getting Started", 3, 45, listOf(
+    UnitItem(1, "Unit 1: Getting Started", 3,  listOf(
         SubTopic(101, "What is Machine Learning?"),
         SubTopic(102, "Types of ML Algorithms"),
     )),
-    UnitItem(2, "Unit 2: Data Preprocessing", 4, 60, listOf(
+    UnitItem(2, "Unit 2: Data Preprocessing", 4, listOf(
         SubTopic(201, "Data Cleaning"),
         SubTopic(202, "Feature Scaling"),
     ))

@@ -4,10 +4,11 @@ import android.content.Context
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    private const val BASE_URL = "https://7e16747a8990.ngrok-free.app/" // Use this for Android Emulator
+    private const val BASE_URL = "https://647b68266be9.ngrok-free.app/" // Use this for Android Emulator
 
     // --- Public API Client (for /login, /register) ---
     val publicApi: ApiService by lazy {
@@ -28,6 +29,9 @@ object RetrofitClient {
             .create(ApiService::class.java)
 
         val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(50, TimeUnit.SECONDS) // increase as needed
+            .readTimeout(120, TimeUnit.SECONDS)    // important: wait longer for response
+            .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(AuthInterceptor(context, refreshApi))
             .build()
 
