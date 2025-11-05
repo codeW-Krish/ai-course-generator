@@ -9,18 +9,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.jetpackdemo.data.api.RetrofitClient
 import com.example.jetpackdemo.data.repository.CourseRepository
-import com.example.jetpackdemo.ui.theme.AppColors // Import the central theme
 import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 import com.example.jetpackdemo.viewmodels.CourseViewModelFactory
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext  // APPLICATION CONTEXT
 
     // ⚠️ Do NOT use remember here
     val api = RetrofitClient.getAuthApi(context)
     val repository = CourseRepository(api)
-    val factory = CourseViewModelFactory(repository)
+    val factory = CourseViewModelFactory(repository, context as Application)
 
     // ✅ ViewModel scoped properly
     val courseViewModel: CourseViewModel = viewModel(factory = factory)
@@ -79,6 +78,7 @@ fun AppNavGraph(navController: NavHostController) {
         }
         composable("course_content") {
             CourseContentScreen(
+                courseViewModel = courseViewModel,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

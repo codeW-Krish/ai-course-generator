@@ -10,8 +10,9 @@ class CourseRepository(private val api: ApiService) {
         return api.generateOutline(request)
     }
 
-    suspend fun generateContent(courseId: String): Response<ContentGenerationStatusResponse> {
-        return api.generateContent(courseId)
+    // Add this method to your CourseRepository class
+    suspend fun generateContent(courseId: String, provider: String? = null, model: String? = null): Response<ContentGenerationStatusResponse> {
+        return api.generateContent(courseId, provider, model)
     }
 
     suspend fun getCourseGenerationStatus(courseId: String, since: String? = null): Response<GenerationStatusResponse> {

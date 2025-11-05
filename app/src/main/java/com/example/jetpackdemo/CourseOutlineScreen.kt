@@ -3,7 +3,7 @@ package com.example.jetpackdemo
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -1378,6 +1379,9 @@ fun CourseOutlineScreen(
     // State for edit sub-topic dialog
     var editingSubTopic by remember { mutableStateOf<SubTopic?>(null) }
 
+    // State for add sub-topic dialog
+    var unitToAddSubTopic by remember { mutableStateOf<UnitItem?>(null) }
+
     // When update result changes, show toast on success or error
     LaunchedEffect(updateOutlineResult) {
         updateOutlineResult?.let { resource ->
@@ -1494,7 +1498,23 @@ fun CourseOutlineScreen(
                     tonalElevation = 8.dp
                 ) {
                     Button(
-                        onClick = onGenerateContent,
+                        onClick = {
+                            if (!courseId.isNullOrEmpty()) {
+                                // Start content generation
+                                // NEW: Start STREAMING generation with provider
+                                courseViewModel.startStreamingGeneration(
+                                    courseId = courseId!!,
+//                                    provider = "Cerebras",  // CHANGE LATER
+                                    provider = "Groq",  // CHANGE LATER
+//                                    provider = "Gemini",  // CHANGE LATER
+                                    model = null            // Optional
+                                )
+                                // Navigate immediately
+                                onGenerateContent()
+                            } else {
+                                Toast.makeText(context, "Course ID not available", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1540,7 +1560,7 @@ fun CourseOutlineScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                     }
 
-                    items(tempUnits) { unit -> // Always use tempUnits for display
+                    items(tempUnits) { unit ->
                         UnitCard(
                             unit = unit,
                             isExpanded = expandedUnitId == unit.id,
@@ -1548,7 +1568,8 @@ fun CourseOutlineScreen(
                             onExpand = { expandedUnitId = if (expandedUnitId == unit.id) null else unit.id },
                             onDeleteUnit = { itemToDelete = unit },
                             onDeleteSubTopic = { subTopic -> itemToDelete = subTopic },
-                            onEditSubTopic = { subTopic -> editingSubTopic = subTopic }
+                            onEditSubTopic = { subTopic -> editingSubTopic = subTopic },
+                            onAddSubTopic = { unitToAddSubTopic = unit } // New callback for adding sub-topic
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -1596,10 +1617,157 @@ fun CourseOutlineScreen(
                         }
                     )
                 }
+
+                // Add Sub-topic Dialog
+                unitToAddSubTopic?.let { unit ->
+                    AddSubTopicDialog(
+                        unit = unit,
+                        onDismiss = { unitToAddSubTopic = null },
+                        onAdd = { newSubTopicTitle ->
+                            // Generate a unique ID for the new sub-topic
+                            val newId = (unit.subTopics.maxByOrNull { it.id }?.id ?: unit.id * 100) + 1
+                            val newSubTopic = SubTopic(id = newId, title = newSubTopicTitle)
+
+                            tempUnits = tempUnits.map { u ->
+                                if (u.id == unit.id) {
+                                    u.copy(subTopics = u.subTopics + newSubTopic)
+                                } else {
+                                    u
+                                }
+                            }
+                            unitToAddSubTopic = null
+                        }
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+fun UnitCard(
+    unit: UnitItem,
+    isExpanded: Boolean,
+    isEditMode: Boolean,
+    onExpand: () -> Unit,
+    onEditSubTopic: (SubTopic) -> Unit,
+    onDeleteSubTopic: (SubTopic) -> Unit,
+    onDeleteUnit: () -> Unit,
+    onAddSubTopic: () -> Unit // New parameter for adding sub-topic
+) {
+    val rotationAngle by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .clickable(onClick = onExpand)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        unit.title,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.textPrimary,
+                        fontSize = 18.sp
+                    )
+                }
+                if (isEditMode) {
+                    // Delete Unit Button
+                    IconButton(onClick = onDeleteUnit, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Unit", tint = AppColors.textSecondary)
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Expand",
+                    tint = AppColors.textSecondary,
+                    modifier = Modifier.rotate(rotationAngle)
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    unit.subTopics.forEach { subTopic ->
+                        SubTopicItem(
+                            subTopic = subTopic,
+                            isEditMode = isEditMode,
+                            onEdit = { onEditSubTopic(subTopic) },
+                            onDelete = { onDeleteSubTopic(subTopic) }
+                        )
+                    }
+
+                    // Add Sub-topic Button (only visible in edit mode)
+                    if (isEditMode) {
+                        Button(
+                            onClick = onAddSubTopic,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Sub-topic", tint = AppColors.onPrimary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Add Sub-topic", color = AppColors.onPrimary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddSubTopicDialog(
+    unit: UnitItem,
+    onDismiss: () -> Unit,
+    onAdd: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Sub-topic to ${unit.title}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Sub-topic title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Minimum 2 characters required",
+                    fontSize = 12.sp,
+                    color = AppColors.textSecondary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (text.length >= 2) {
+                        onAdd(text)
+                    }
+                },
+                enabled = text.length >= 2
+            ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+// The rest of your composables (SubTopicItem, EditSubTopicDialog, DeleteConfirmationDialog, etc.) remain the same
 @Composable
 fun CourseHeader(title: String, description: String) {
     Column {
@@ -1691,68 +1859,69 @@ fun CourseHeader(title: String, description: String) {
 //        }
 //    }
 //}
-@Composable
-fun UnitCard(
-    unit: UnitItem,
-    isExpanded: Boolean,
-    isEditMode: Boolean,
-    onExpand: () -> Unit,
-    onEditSubTopic: (SubTopic) -> Unit,
-    onDeleteSubTopic: (SubTopic) -> Unit,
-    onDeleteUnit: () -> Unit
-) {
-    val rotationAngle by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f)
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .clickable(onClick = onExpand)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        unit.title,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.textPrimary,
-                        fontSize = 18.sp
-                    )
-                }
-                if (isEditMode) {
-                    // Delete Unit Button
-                    IconButton(onClick = onDeleteUnit, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete Unit", tint = AppColors.textSecondary)
-                    }
-                }
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Expand",
-                    tint = AppColors.textSecondary,
-                    modifier = Modifier.rotate(rotationAngle)
-                )
-            }
-
-            AnimatedVisibility(visible = isExpanded) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    unit.subTopics.forEach { subTopic ->
-                        SubTopicItem(
-                            subTopic = subTopic,
-                            isEditMode = isEditMode,
-                            onEdit = { onEditSubTopic(subTopic) },
-                            onDelete = { onDeleteSubTopic(subTopic) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+// WORKING UNIT CARD
+//@Composable
+//fun UnitCard(
+//    unit: UnitItem,
+//    isExpanded: Boolean,
+//    isEditMode: Boolean,
+//    onExpand: () -> Unit,
+//    onEditSubTopic: (SubTopic) -> Unit,
+//    onDeleteSubTopic: (SubTopic) -> Unit,
+//    onDeleteUnit: () -> Unit
+//) {
+//    val rotationAngle by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f)
+//
+//    Card(
+//        modifier = Modifier.fillMaxWidth(),
+//        shape = RoundedCornerShape(16.dp),
+//        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+//        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+//    ) {
+//        Column {
+//            Row(
+//                modifier = Modifier
+//                    .clickable(onClick = onExpand)
+//                    .padding(16.dp),
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Column(modifier = Modifier.weight(1f)) {
+//                    Text(
+//                        unit.title,
+//                        fontWeight = FontWeight.Bold,
+//                        color = AppColors.textPrimary,
+//                        fontSize = 18.sp
+//                    )
+//                }
+//                if (isEditMode) {
+//                    // Delete Unit Button
+//                    IconButton(onClick = onDeleteUnit, modifier = Modifier.size(24.dp)) {
+//                        Icon(Icons.Default.Delete, contentDescription = "Delete Unit", tint = AppColors.textSecondary)
+//                    }
+//                }
+//                Icon(
+//                    imageVector = Icons.Default.KeyboardArrowDown,
+//                    contentDescription = "Expand",
+//                    tint = AppColors.textSecondary,
+//                    modifier = Modifier.rotate(rotationAngle)
+//                )
+//            }
+//
+//            AnimatedVisibility(visible = isExpanded) {
+//                Column(modifier = Modifier.padding(16.dp)) {
+//                    unit.subTopics.forEach { subTopic ->
+//                        SubTopicItem(
+//                            subTopic = subTopic,
+//                            isEditMode = isEditMode,
+//                            onEdit = { onEditSubTopic(subTopic) },
+//                            onDelete = { onDeleteSubTopic(subTopic) }
+//                        )
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
 
 @Composable
 fun SubTopicItem(subTopic: SubTopic, isEditMode: Boolean, onDelete: () -> Unit, onEdit: () -> Unit) {
@@ -1888,7 +2057,8 @@ fun CourseOutlineScreenPreview() {
                     onExpand = {},
                     onEditSubTopic = {},
                     onDeleteSubTopic = {},
-                    onDeleteUnit = {}
+                    onDeleteUnit = {},
+                    onAddSubTopic = {}
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }

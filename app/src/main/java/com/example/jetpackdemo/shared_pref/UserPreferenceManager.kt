@@ -7,36 +7,25 @@ import androidx.security.crypto.MasterKeys
 // This class is responsible for securely saving and retrieving the user's API key.
 class UserPreferencesManager(context: Context) {
 
-    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+    private val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
-    private val sharedPreferences = EncryptedSharedPreferences.create(
-        "user_api_key_prefs",
-        masterKeyAlias,
-        context,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
-
-    companion object {
-        private const val API_KEY = "gemini_api_key"
+    fun saveOutlineProvider(provider: String) {
+        sharedPreferences.edit().putString("outline_provider", provider).apply()
     }
 
-    fun saveApiKey(apiKey: String) {
-        with(sharedPreferences.edit()) {
-            putString(API_KEY, apiKey)
-            apply()
-        }
+    fun getOutlineProvider(): String? {
+        return sharedPreferences.getString("outline_provider", null)
     }
 
-    fun getApiKey(): String {
-        return sharedPreferences.getString(API_KEY, "") ?: ""
+    fun saveContentProvider(provider: String) {
+        sharedPreferences.edit().putString("content_provider", provider).apply()
     }
 
-    // New function to clear the API key on logout
-    fun clearApiKey() {
-        with(sharedPreferences.edit()) {
-            remove(API_KEY)
-            apply()
-        }
+    fun getContentProvider(): String? {
+        return sharedPreferences.getString("content_provider", null)
+    }
+
+    fun clearAll() {
+        sharedPreferences.edit().clear().apply()
     }
 }

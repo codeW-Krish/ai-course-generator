@@ -64,8 +64,7 @@ data class EnrollCourseRequest(
 data class EnrollResponse(
     val message: String
 )
-
-// --- Course Full Response with Units + Subtopics ---
+// Update your data models to include videos
 data class CourseFullResponse(
     val course: Course,
     val units: List<UnitWithSubtopics>
@@ -77,7 +76,7 @@ data class UnitWithSubtopics(
     val courseId: String,
     val title: String,
     val position: Int,
-    val subtopics: List<Subtopic>
+    val subtopics: List<Subtopic> // This now includes videos
 )
 
 data class Subtopic(
@@ -86,9 +85,23 @@ data class Subtopic(
     val unitId: String,
     val title: String,
     val content: String?,
-    val position: Int
+    val position: Int,
+    val contentGeneratedAt: String?,
+    val videos: List<Video> = emptyList() // Add this field
 )
 
+// Add Video data class
+data class Video(
+    val id: String,
+    @SerializedName("subtopic_id")
+    val subtopicId: String,
+    val title: String,
+    @SerializedName("youtube_url")
+    val youtubeUrl: String,
+    val thumbnail: String,
+    @SerializedName("duration_sec")
+    val durationSec: Int?
+)
 // --- Generated Subtopic Content (matches SubtopicContentSchema) ---
 data class GeneratedSubtopicContent(
     @SerializedName("subtopic_title")

@@ -13,10 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.jetpackdemo.ui.theme.AppColors
 import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 
@@ -78,7 +76,9 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
                                 description = courseDescription,
                                 numUnits = numberOfUnits,
                                 difficulty = difficultyLevel,
-                                includeVideos = includeYouTube
+                                includeVideos = includeYouTube,
+                                provider ="Groq",
+                                model =null
                             )
                             onGenerateOutline()
                         },
@@ -153,7 +153,7 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
             FormSection(label = "Number of Units", hint = "Choose how many units your course should have") {
                 DropdownSelector(
                     label = "Select unit count",
-                    items = listOf("3 Units", "4 Units", "5 Units", "6 Units", "7 Units", "8 Units"),
+                    items = listOf("1 Units","2 Units","3 Units", "4 Units", "5 Units", "6 Units", "7 Units", "8 Units"),
                     selectedText = "$numberOfUnits Units",
                     onItemSelected = {  numberOfUnits = it.trim().split(" ").first().toInt() }
                 )

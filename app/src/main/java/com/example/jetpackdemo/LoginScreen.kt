@@ -133,8 +133,14 @@ fun LoginScreen(navController: NavHostController) {
                             }
 
                         } catch (e: Exception) {
-                            e.message?.let { Log.e("KEY_LOGIN_FAILED", it) };
-                            Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            Log.e("LOGIN_ERROR", "Network failed", e)
+                            val msg = when (e) {
+                                is java.net.UnknownHostException -> "No internet or wrong URL"
+                                is java.net.ConnectException -> "Server not reachable"
+                                is javax.net.ssl.SSLHandshakeException -> "SSL error (ngrok cert)"
+                                else -> e.message ?: "Unknown error"
+                            }
+                            Toast.makeText(context, "Login failed: $msg", Toast.LENGTH_LONG).show()
                         } finally {
                             isLoading = false
                         }

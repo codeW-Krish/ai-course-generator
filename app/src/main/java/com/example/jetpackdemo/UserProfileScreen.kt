@@ -42,13 +42,14 @@ fun UserProfileScreen(navController: NavHostController) {
     val context = LocalContext.current
     val userPrefsManager = remember { UserPreferencesManager(context) }
 
-    var apiKey by rememberSaveable { mutableStateOf("") }
-    var isApiKeyVisible by rememberSaveable { mutableStateOf(false) }
-    var showSuccessToast by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        apiKey = userPrefsManager.getApiKey()
+    // State for provider selections
+    var outlineProvider by rememberSaveable {
+        mutableStateOf(userPrefsManager.getOutlineProvider() ?: "Groq")
     }
+    var contentProvider by rememberSaveable {
+        mutableStateOf(userPrefsManager.getContentProvider() ?: "Groq")
+    }
+    var showSuccessToast by remember { mutableStateOf(false) }
 
     LaunchedEffect(showSuccessToast) {
         if (showSuccessToast) {
@@ -61,7 +62,11 @@ fun UserProfileScreen(navController: NavHostController) {
         containerColor = AppColors.background,
         topBar = {
             TopAppBar(
-                title = { Text("Profile & Settings", fontWeight = FontWeight.Bold, color = AppColors.textPrimary) },
+                title = {
+                    Text("Profile & Settings",
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.textPrimary)
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
@@ -78,20 +83,24 @@ fun UserProfileScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(16.dp))
                 ProfileHeader()
                 Spacer(modifier = Modifier.height(32.dp))
-                ByoApiKeySection(
-                    apiKey = apiKey,
-                    isApiKeyVisible = isApiKeyVisible,
-                    onApiKeyChange = { apiKey = it },
-                    onVisibilityChange = { isApiKeyVisible = !isApiKeyVisible },
+
+                // Provider Selection Section
+                ProviderSelectionSection(
+                    outlineProvider = outlineProvider,
+                    contentProvider = contentProvider,
+                    onOutlineProviderChange = { outlineProvider = it },
+                    onContentProviderChange = { contentProvider = it },
                     onSaveClick = {
-                        userPrefsManager.saveApiKey(apiKey)
+                        userPrefsManager.saveOutlineProvider(outlineProvider)
+                        userPrefsManager.saveContentProvider(contentProvider)
                         showSuccessToast = true
                     }
                 )
+
                 Spacer(modifier = Modifier.height(32.dp))
                 AccountActionsSection(
                     onLogoutClick = {
-                        userPrefsManager.clearApiKey()
+                        userPrefsManager.clearAll()
                         navController.navigate("welcome") {
                             popUpTo("main") { inclusive = true }
                         }
@@ -102,11 +111,138 @@ fun UserProfileScreen(navController: NavHostController) {
 
             SuccessToast(
                 visible = showSuccessToast,
-                message = "API Key saved successfully!",
+                message = "Settings saved successfully!",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 16.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun ProviderSelectionSection(
+    outlineProvider: String,
+    contentProvider: String,
+    onOutlineProviderChange: (String) -> Unit,
+    onContentProviderChange: (String) -> Unit,
+    onSaveClick: () -> Unit
+) {
+    val providers = listOf("Groq", "Cerebras", "Gemini") // Add more as needed
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "AI Provider Settings",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Choose which AI provider to use for generating course content",
+                fontSize = 14.sp,
+                color = AppColors.textSecondary,
+                lineHeight = 20.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Outline Generation Provider
+            Text(
+                "Outline Generation",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.textPrimary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            DropdownMenuProvider(
+                selectedProvider = outlineProvider,
+                onProviderSelected = onOutlineProviderChange,
+                providers = providers,
+                label = "Select provider for course outlines"
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Content Generation Provider
+            Text(
+                "Content Generation",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.textPrimary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            DropdownMenuProvider(
+                selectedProvider = contentProvider,
+                onProviderSelected = onContentProviderChange,
+                providers = providers,
+                label = "Select provider for course content"
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onSaveClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+            ) {
+                Text("Save Settings", color = AppColors.onPrimary)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DropdownMenuProvider(
+    selectedProvider: String,
+    onProviderSelected: (String) -> Unit,
+    providers: List<String>,
+    label: String
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedProvider,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = AppColors.primary,
+                unfocusedIndicatorColor = AppColors.textSecondary.copy(alpha = 0.4f),
+                focusedContainerColor = AppColors.surface,
+                unfocusedContainerColor = AppColors.surface,
+                cursorColor = AppColors.primary,
+                focusedLabelColor = AppColors.primary,
+            )
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            providers.forEach { provider ->
+                DropdownMenuItem(
+                    text = { Text(provider) },
+                    onClick = {
+                        onProviderSelected(provider)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
