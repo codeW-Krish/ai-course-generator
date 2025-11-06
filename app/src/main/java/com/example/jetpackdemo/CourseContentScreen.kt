@@ -3856,13 +3856,138 @@ fun CourseContentDisplay(
 }
 
 
+//@Composable
+//fun FormattedContentDisplay(content: String) {
+//    val lines = content.split("\n")
+//    var currentSection = ""
+//
+//    Column {
+//        lines.forEach { line ->
+//            when {
+//                line.startsWith("Why this matters:") -> {
+//                    currentSection = "why_matters"
+//                    Text(
+//                        "Why this matters:",
+//                        fontSize = 18.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = AppColors.textPrimary,
+//                        modifier = Modifier.padding(vertical = 8.dp)
+//                    )
+//                }
+//                line.startsWith("Core Concepts:") -> {
+//                    currentSection = "core_concepts"
+//                    Text(
+//                        "Core Concepts:",
+//                        fontSize = 18.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = AppColors.textPrimary,
+//                        modifier = Modifier.padding(vertical = 8.dp)
+//                    )
+//                }
+//                line.startsWith("Examples:") -> {
+//                    currentSection = "examples"
+//                    Text(
+//                        "Examples:",
+//                        fontSize = 18.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = AppColors.textPrimary,
+//                        modifier = Modifier.padding(vertical = 8.dp)
+//                    )
+//                }
+//                line.startsWith("Code Example:") -> {
+//                    currentSection = "code"
+//                    Text(
+//                        "Code Example:",
+//                        fontSize = 18.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = AppColors.textPrimary,
+//                        modifier = Modifier.padding(vertical = 8.dp)
+//                    )
+//                }
+//                line.startsWith("•") && currentSection == "core_concepts" -> {
+//                    val parts = line.removePrefix("•").split(":", limit = 2)
+//                    if (parts.size == 2) {
+//                        val concept = parts[0].trim()
+//                        val explanation = parts[1].trim()
+//                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+//                            Text(
+//                                "• $concept:",
+//                                fontWeight = FontWeight.SemiBold,
+//                                color = AppColors.textPrimary
+//                            )
+//                            Text(
+//                                explanation,
+//                                color = AppColors.textSecondary,
+//                                modifier = Modifier.padding(start = 16.dp)
+//                            )
+//                        }
+//                    } else {
+//                        Text(line, color = AppColors.textSecondary)
+//                    }
+//                }
+//                line.matches(Regex("\\d+\\. \\[.*\\]:.*")) && currentSection == "examples" -> {
+//                    val parts = line.split("]:", limit = 2)
+//                    if (parts.size == 2) {
+//                        val numberAndType = parts[0].removePrefix("[").split(" [")
+//                        val exampleContent = parts[1].trim()
+//                        if (numberAndType.size == 2) {
+//                            val number = numberAndType[0]
+//                            val type = numberAndType[1]
+//                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+//                                Text(
+//                                    "$number [${type.replaceFirstChar { it.uppercase() }}]:",
+//                                    fontWeight = FontWeight.SemiBold,
+//                                    color = AppColors.textPrimary
+//                                )
+//                                Text(
+//                                    exampleContent,
+//                                    color = AppColors.textSecondary,
+//                                    modifier = Modifier.padding(start = 16.dp),
+//                                    fontStyle = if (type.contains("analog", ignoreCase = true))
+//                                        FontStyle.Italic else FontStyle.Normal
+//                                )
+//                            }
+//                        }
+//                    }
+//                }
+//                currentSection == "code" && line.isNotBlank() -> {
+//                    Card(
+//                        modifier = Modifier.fillMaxWidth(),
+//                        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2D2D))
+//                    ) {
+//                        Text(
+//                            line,
+//                            color = Color.White,
+//                            fontSize = 12.sp,
+//                            modifier = Modifier.padding(12.dp),
+//                            fontFamily = FontFamily.Monospace
+//                        )
+//                    }
+//                }
+//                line.isNotBlank() -> {
+//                    Text(
+//                        line,
+//                        color = when (currentSection) {
+//                            "why_matters" -> AppColors.textSecondary
+//                            else -> AppColors.textPrimary
+//                        },
+//                        fontSize = 16.sp,
+//                        lineHeight = 24.sp
+//                    )
+//                }
+//            }
+//        }
+//    }
+//}
+
 @Composable
 fun FormattedContentDisplay(content: String) {
     val lines = content.split("\n")
     var currentSection = ""
+    val codeBuffer = StringBuilder() // collect code lines
 
-    Column {
-        lines.forEach { line ->
+    Column(modifier = Modifier.padding(8.dp)) {
+        lines.forEachIndexed { index, line ->
             when {
                 line.startsWith("Why this matters:") -> {
                     currentSection = "why_matters"
@@ -3896,6 +4021,7 @@ fun FormattedContentDisplay(content: String) {
                 }
                 line.startsWith("Code Example:") -> {
                     currentSection = "code"
+                    codeBuffer.clear() // reset buffer
                     Text(
                         "Code Example:",
                         fontSize = 18.sp,
@@ -3903,6 +4029,9 @@ fun FormattedContentDisplay(content: String) {
                         color = AppColors.textPrimary,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
+                }
+                currentSection == "code" -> {
+                    codeBuffer.appendLine(line) // collect all code lines
                 }
                 line.startsWith("•") && currentSection == "core_concepts" -> {
                     val parts = line.removePrefix("•").split(":", limit = 2)
@@ -3933,35 +4062,30 @@ fun FormattedContentDisplay(content: String) {
                         if (numberAndType.size == 2) {
                             val number = numberAndType[0]
                             val type = numberAndType[1]
-                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                Text(
-                                    "$number [${type.replaceFirstChar { it.uppercase() }}]:",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = AppColors.textPrimary
-                                )
-                                Text(
-                                    exampleContent,
-                                    color = AppColors.textSecondary,
-                                    modifier = Modifier.padding(start = 16.dp),
-                                    fontStyle = if (type.contains("analog", ignoreCase = true))
-                                        FontStyle.Italic else FontStyle.Normal
-                                )
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFEFEFEF))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        "$number [${type.replaceFirstChar { it.uppercase() }}]:",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppColors.textPrimary
+                                    )
+                                    Text(
+                                        exampleContent,
+                                        color = AppColors.textSecondary,
+                                        modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                                        fontStyle = if (type.contains("analog", ignoreCase = true))
+                                            FontStyle.Italic else FontStyle.Normal,
+                                        lineHeight = 20.sp
+                                    )
+                                }
                             }
                         }
-                    }
-                }
-                currentSection == "code" && line.isNotBlank() -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2D2D))
-                    ) {
-                        Text(
-                            line,
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(12.dp),
-                            fontFamily = FontFamily.Monospace
-                        )
                     }
                 }
                 line.isNotBlank() -> {
@@ -3976,9 +4100,29 @@ fun FormattedContentDisplay(content: String) {
                     )
                 }
             }
+
+            // After finishing last line or switching section, render collected code
+            if ((currentSection != "code" || index == lines.lastIndex) && codeBuffer.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2D2D))
+                ) {
+                    Text(
+                        codeBuffer.toString(),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp),
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                codeBuffer.clear() // reset after rendering
+            }
         }
     }
 }
+
 
 
 @Composable
@@ -4201,21 +4345,49 @@ fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
         }
     }
 }
-// FIXED: Better content conversion with error handling
-// FIXED: Better content conversion with error handling
+
+private fun normalizeBackendString(input: String?): String? {
+    return input
+        ?.replace("\\n", "\n")
+        ?.replace("\\t", "\t")
+        ?.replace("\\\"", "\"")
+        ?.replace("\\\\", "\\")
+        ?.trim()
+}
+
+private fun normalizeGeneratedContent(original: GeneratedSubtopicContent): GeneratedSubtopicContent {
+    return original.copy(
+        subtopicTitle = normalizeBackendString(original.subtopicTitle) ?: "",
+        title = normalizeBackendString(original.title) ?: "",
+        whyThisMatters = normalizeBackendString(original.whyThisMatters) ?: "",
+        coreConcepts = original.coreConcepts.map { concept ->
+            concept.copy(explanation = normalizeBackendString(concept.explanation) ?: "")
+        },
+        examples = original.examples.map { example ->
+            example.copy(content = normalizeBackendString(example.content) ?: "")
+        },
+        codeOrMath = normalizeBackendString(original.codeOrMath),
+        youtubeKeywords = original.youtubeKeywords // leave as is
+    )
+}
+
 private fun convertToSubTopicContent(subtopic: Subtopic): SubTopicContent? {
     return try {
-        val generatedContent = parseGeneratedContent(subtopic.content)
-        if (generatedContent == null) {
-            Log.e("CONTENT_CONVERSION", "Failed to parse content for: ${subtopic.title}, Content: ${subtopic.content?.take(100)}")
+        // First parse the backend JSON
+        val parsedContent = parseGeneratedContent(subtopic.content)
+        if (parsedContent == null) {
+            Log.e("CONTENT_CONVERSION", "Failed to parse content for: ${subtopic.title}")
             return null
         }
+
+        // Create a normalized copy
+        val generatedContent = normalizeGeneratedContent(parsedContent)
 
         val readTimeMinutes = estimateReadTime(generatedContent.whyThisMatters ?: "")
 
         SubTopicContent(
             id = subtopic.id,
-            title = generatedContent.subtopicTitle ?: subtopic.title,
+            title = generatedContent.subtopicTitle,
             readTimeMinutes = readTimeMinutes,
             content = buildString {
                 append("${generatedContent.title}\n\n")
@@ -4231,15 +4403,14 @@ private fun convertToSubTopicContent(subtopic: Subtopic): SubTopicContent? {
                 if (generatedContent.examples.isNotEmpty()) {
                     append("\nExamples:\n")
                     generatedContent.examples.forEachIndexed { index, example ->
-                        val formattedType = example.type.replace("_", " ").replaceFirstChar { it.uppercase() }
+                        val formattedType = example.type.replace("_", " ")
+                            .replaceFirstChar { it.uppercase() }
                         append("${index + 1}. [$formattedType]: ${example.content}\n")
                     }
                 }
 
-                generatedContent.codeOrMath?.let { code ->
-                    if (code.isNotBlank()) {
-                        append("\nCode Example:\n$code")
-                    }
+                if (!generatedContent.codeOrMath.isNullOrBlank()) {
+                    append("\nCode Example:\n${generatedContent.codeOrMath}")
                 }
             },
             videos = subtopic.videos.map { video ->
@@ -4251,6 +4422,7 @@ private fun convertToSubTopicContent(subtopic: Subtopic): SubTopicContent? {
         null
     }
 }
+
 
 // Helper functions
 //private fun convertToSubTopicContent(subtopic: Subtopic): SubTopicContent {

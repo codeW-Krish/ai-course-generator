@@ -23,6 +23,7 @@ import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit
 ) {
     val contentProvider by courseViewModel.selectedContentProvider.collectAsState()
+    val outlineProvider by courseViewModel.selectedOutlineProvider.collectAsState()
     var courseTitle by remember { mutableStateOf("") }
     var courseDescription by remember { mutableStateOf("") }
     var includeYouTube by remember { mutableStateOf(false) }
@@ -92,7 +93,7 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
                                 numUnits = numberOfUnits,
                                 difficulty = difficultyLevel,
                                 includeVideos = includeYouTube,
-                                provider = contentProvider,
+                                provider = outlineProvider,
                                 model =null
                             )
                             onGenerateOutline()
