@@ -29,6 +29,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 import com.example.jetpackdemo.ui.theme.AppColors
 
 // --- Data Models ---
@@ -52,7 +53,7 @@ data class BottomNavItem(val title: String, val route: String, val icon: ImageVe
 
 // --- Main Screen with Bottom Navigation ---
 @Composable
-fun MainScreen(navController: NavHostController) {
+fun MainScreen(navController: NavHostController, courseViewModel: CourseViewModel) {
     val bottomBarNavController = rememberNavController()
     Scaffold(
         bottomBar = { HomeBottomNavigation(navController = bottomBarNavController) }
@@ -60,7 +61,8 @@ fun MainScreen(navController: NavHostController) {
         Box(modifier = Modifier.padding(paddingValues)) {
             BottomNavGraph(
                 bottomBarNavController = bottomBarNavController,
-                appNavController = navController
+                appNavController = navController,
+                courseViewModel = courseViewModel
             )
         }
     }
@@ -68,7 +70,7 @@ fun MainScreen(navController: NavHostController) {
 
 // --- Navigation Graph for the Bottom Bar Tabs ---
 @Composable
-fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: NavHostController) {
+fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: NavHostController, courseViewModel: CourseViewModel) {
     NavHost(navController = bottomBarNavController, startDestination = "home") {
         composable("home") {
             HomeScreen(
@@ -81,7 +83,7 @@ fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: 
             }
         }
         composable("profile") {
-            UserProfileScreen(navController = appNavController)
+            UserProfileScreen(navController = appNavController, courseViewModel = courseViewModel)
         }
     }
 }
@@ -337,8 +339,8 @@ fun Chip(text: String) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun MainScreenPreview() {
-    MainScreen(navController = rememberNavController())
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun MainScreenPreview() {
+//    MainScreen(navController = rememberNavController())
+//}

@@ -45,7 +45,7 @@ fun AppNavGraph(navController: NavHostController) {
         // --- Main App Screen (with bottom navigation) ---
         composable("main") {
             // Pass the main NavController to the MainScreen
-            MainScreen(navController = navController)
+            MainScreen(navController = navController, courseViewModel = courseViewModel)
         }
 
         // --- Course Creation Flow (navigated to from Home) ---

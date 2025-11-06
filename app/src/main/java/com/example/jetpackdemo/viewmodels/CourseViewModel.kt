@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import android.content.Context
 import com.example.jetpackdemo.data.model.SSEEvent
+import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,6 +26,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.Buffer
 import java.io.IOException
 
 // A sealed class to wrap state (you can reuse this for all API calls)
@@ -114,6 +116,38 @@ class CourseViewModel(
     // Polling state
     private val _isPollingActive = MutableStateFlow(false)
     val isPollingActive = _isPollingActive.asStateFlow()
+
+    private var pollingJob: Job? = null
+
+    // ADD THESE NEW PROPERTIES RIGHT AFTER pollingJob:
+    private val userPrefsManager = UserPreferencesManager(application)
+
+    private val _selectedContentProvider = MutableStateFlow("Groq")
+    val selectedContentProvider = _selectedContentProvider.asStateFlow()
+
+    private val _selectedOutlineProvider = MutableStateFlow("Groq")
+    val selectedOutlineProvider = _selectedOutlineProvider.asStateFlow()
+
+    private val _isStreamingProvider = MutableStateFlow(true)
+    val isStreamingProvider = _isStreamingProvider.asStateFlow()
+
+
+    // ADD THIS INIT BLOCK (place it after all property declarations):
+    init {
+        viewModelScope.launch {
+            // Load providers from preferences
+            val contentProvider = userPrefsManager.getContentProvider() ?: "Groq"
+            val outlineProvider = userPrefsManager.getOutlineProvider() ?: "Groq"
+
+            _selectedContentProvider.value = contentProvider
+            _selectedOutlineProvider.value = outlineProvider
+            _isStreamingProvider.value = !contentProvider.equals("cerebras", ignoreCase = true)
+
+            Log.d("VIEWMODEL", "Loaded providers - Content: $contentProvider, Outline: $outlineProvider")
+        }
+    }
+
+
 
     data class GenerationProgress(
         val generated: Int,
@@ -256,7 +290,7 @@ class CourseViewModel(
 //    }
 // Add this to track polling state
 
-    private var pollingJob: Job? = null
+
 
     // FIXED: Proper polling logic with correct content detection
     fun startPollingFullContent(courseId: String) {
@@ -264,7 +298,7 @@ class CourseViewModel(
         pollingJob = viewModelScope.launch {
             _isPollingActive.value = true
             var pollCount = 0
-            val maxPolls = 30 // 60 seconds maximum
+            val maxPolls = 70 // 60 seconds maximum
 
             Log.d("POLLING", "Starting polling for course: $courseId")
 
@@ -432,6 +466,8 @@ class CourseViewModel(
 //            })
 //        }
 //    }
+
+    // 1000% WORKING
     fun startStreamingGeneration(courseId: String, provider: String? = null, model: String? = null) {
         Log.d("STREAMING", "🚀 STARTING STREAMING for courseId: $courseId")
 
@@ -696,6 +732,123 @@ class CourseViewModel(
 
         }
     }
+//    fun startStreamingGeneration(courseId: String, provider: String? = null, model: String? = null) {
+//        Log.d("STREAMING", "🚀 STARTING STREAMING for courseId: $courseId")
+//
+//        viewModelScope.launch(Dispatchers.IO) {
+//            withContext(Dispatchers.Main) {
+//                _currentStreamingText.value = ""
+//                _currentStreamingSubtopic.value = null
+//                _isGeneratingContent.value = true
+//                _generationProgress.value = null
+//                _generationStartTime.value = System.currentTimeMillis()
+//                _isPollingActive.value = false
+//            }
+//
+//            val client = RetrofitClient.getOkHttpClientForSSE(context)
+//
+//            val requestBody = buildString {
+//                append("{\n")
+//                append("  \"provider\": \"${provider ?: "Groq"}\"")
+//                if (model != null) {
+//                    append(",\n  \"model\": \"$model\"")
+//                }
+//                append("\n}")
+//            }.toRequestBody("application/json".toMediaType())
+//
+//            val request = Request.Builder()
+//                .url("${RetrofitClient.BASE_URL}api/courses/$courseId/generate-content-stream")
+//                .post(requestBody)
+//                .build()
+//
+//            Log.d("STREAMING", "📡 SSE URL: ${request.url}")
+//
+//            try {
+//                client.newCall(request).execute().use { response ->
+//                    if (!response.isSuccessful) {
+//                        Log.e("STREAMING", "❌ SSE Failed: HTTP ${response.code}")
+//                        withContext(Dispatchers.Main) {
+//                            _streamingEvents.tryEmit(SSEEvent(type = "error", message = "HTTP ${response.code}"))
+//                            stopStreaming()
+//                        }
+//                        return@launch
+//                    }
+//
+//                    Log.d("STREAMING", "✅ SSE Connected, starting to read stream...")
+//
+//                    val source = response.body?.source()
+//                    val buffer = Buffer()
+//
+//                    while (true) {
+//                        // Read chunks in real-time instead of waiting for complete lines
+//                        val bytesRead = source?.read(buffer, 8192) ?: -1
+//                        if (bytesRead == -1L) break
+//
+//                        val chunk = buffer.readUtf8()
+//                        buffer.clear()
+//
+//                        // Process each line in the chunk immediately
+//                        chunk.lines().forEach { line ->
+//                            if (line.startsWith("data:")) {
+//                                val json = line.removePrefix("data:").trim()
+//                                if (json == "[DONE]" || json.isEmpty()) return@forEach
+//
+//                                try {
+//                                    val event = Gson().fromJson(json, SSEEvent::class.java)
+//                                    Log.d("SSE_PARSED", "📨 Type: ${event.type}")
+//
+//                                    when (event.type) {
+//                                        "chunk" -> {
+//                                            val chunkData = event.chunk.orEmpty()
+//                                            val subtopic = event.subtopic.orEmpty()
+//
+//                                            if (chunkData.isNotBlank()) {
+//                                                viewModelScope.launch(Dispatchers.Main) {
+//                                                    _currentStreamingText.update { current ->
+//                                                        current + chunkData
+//                                                    }
+//                                                    if (subtopic.isNotBlank() && subtopic != _currentStreamingSubtopic.value) {
+//                                                        _currentStreamingSubtopic.value = subtopic
+//                                                    }
+//                                                    _streamingEvents.tryEmit(event)
+//                                                }
+//                                            }
+//                                        }
+//                                        // Handle other event types...
+//                                        "progress" -> {
+//                                            viewModelScope.launch(Dispatchers.Main) {
+//                                                updateProgress(event)
+//                                                _streamingEvents.tryEmit(event)
+//                                            }
+//                                        }
+//                                        "complete" -> {
+//                                            viewModelScope.launch(Dispatchers.Main) {
+//                                                _isGeneratingContent.value = false
+//                                                startPollingFullContent(courseId)
+//                                            }
+//                                        }
+//                                        "error" -> {
+//                                            viewModelScope.launch(Dispatchers.Main) {
+//                                                stopStreaming()
+//                                            }
+//                                        }
+//                                    }
+//                                } catch (e: Exception) {
+//                                    Log.e("SSE", "❌ Parse error: $line", e)
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            } catch (e: Exception) {
+//                Log.e("STREAMING", "❌ SSE Failed: ${e.message}", e)
+//                withContext(Dispatchers.Main) {
+//                    _streamingEvents.tryEmit(SSEEvent(type = "error", message = e.message))
+//                    stopStreaming()
+//                }
+//            }
+//        }
+//    }
 
     fun updateProgress(event: SSEEvent) {
         if (event.type == "progress") {
@@ -728,6 +881,86 @@ class CourseViewModel(
         stopStreaming()
         super.onCleared()
     }
+
+
+    fun clearCourseState() {
+        viewModelScope.launch {
+            Log.d("VIEWMODEL", "🧹 Clearing course state")
+            _isGeneratingContent.value = false
+            _currentStreamingText.value = ""
+            _currentStreamingSubtopic.value = null
+            _generationProgress.value = null
+            _isPollingActive.value = false
+            _fullCourseContent.value = Resource.Loading()
+            stopStreaming()
+        }
+    }
+
+    /**
+     * Clear outline generation state
+     */
+    fun clearOutlineState() {
+        viewModelScope.launch {
+            Log.d("VIEWMODEL", "🧹 Clearing outline state")
+            // Clear outline-related states
+            _outlineState.value = null
+            _updateOutline.value = null
+            _courseId.value = null
+        }
+    }
+
+    /**
+     * Generate course content with provider-aware logic
+     */
+    fun generateCourseContent(courseId: String) {
+        viewModelScope.launch {
+            val provider = _selectedContentProvider.value
+            val isCerebras = provider.equals("cerebras", ignoreCase = true)
+
+            _isStreamingProvider.value = !isCerebras
+            _isGeneratingContent.value = true
+            _currentStreamingText.value = ""
+            _currentStreamingSubtopic.value = null
+
+            if (isCerebras) {
+                Log.d("GENERATION", "🚀 Starting non-streaming batch for Cerebras")
+            } else {
+                Log.d("GENERATION", "📡 Starting streaming batches for $provider")
+            }
+
+            // Start the generation process
+            startStreamingGeneration(courseId, provider)
+
+            // Start polling to check when content is ready
+//            startPollingFullContent(courseId)
+        }
+    }
+
+    /**
+     * Update providers when user changes them in settings
+     */
+    fun updateProviders(contentProvider: String, outlineProvider: String) {
+        viewModelScope.launch {
+            _selectedContentProvider.value = contentProvider
+            _selectedOutlineProvider.value = outlineProvider
+            _isStreamingProvider.value = !contentProvider.equals("cerebras", ignoreCase = true)
+
+            // Save to preferences
+            userPrefsManager.saveContentProvider(contentProvider)
+            userPrefsManager.saveOutlineProvider(outlineProvider)
+
+            Log.d("VIEWMODEL", "✅ Updated providers - Content: $contentProvider, Outline: $outlineProvider")
+        }
+    }
+
+    fun clearPrefManager(){
+        viewModelScope.launch {
+            userPrefsManager.clearAll()
+        }
+    }
+
+
+
     private var request: GenerateOutlineRequest? = null
     fun prepareOutlineRequest(
         title: String,
@@ -805,6 +1038,9 @@ class CourseViewModel(
             }
         }
     }
+
+
+
 
 //    // Update the generateCourseContent method
 //    fun generateCourseContent(courseId: String, provider: String? = null, model: String? = null) {
@@ -900,7 +1136,7 @@ class CourseViewModel(
 //            try {
 //                val response = repository.getFullCourse(courseId)
 //                if (response.isSuccessful && response.body() != null) {
-//                    _fullCourseContent.value = Resource.Success(response.body()!!)
+//                    _fullCourseContent.value = Resource.Success(data?.copy())
 //                } else {
 //                    val errorMsg = "HTTP ${response.code()}: ${response.message()}"
 //                    _fullCourseContent.value = Resource.Error(errorMsg, previousData)

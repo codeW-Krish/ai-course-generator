@@ -22,11 +22,26 @@ import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 @Composable
 fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> Unit, onGenerateOutline: () -> Unit
 ) {
+    val contentProvider by courseViewModel.selectedContentProvider.collectAsState()
     var courseTitle by remember { mutableStateOf("") }
     var courseDescription by remember { mutableStateOf("") }
     var includeYouTube by remember { mutableStateOf(false) }
     var numberOfUnits by remember { mutableStateOf(0) }
     var difficultyLevel by remember { mutableStateOf("") }
+
+    // Determine unit options based on provider
+    val maxUnits = remember(contentProvider) {
+        when {
+            contentProvider.equals("Cerebras", ignoreCase = true) -> 10
+            contentProvider.equals("Gemini", ignoreCase = true) -> 4
+            else -> 6 // Default to Groq behavior
+        }
+    }
+    val unitItems = remember(maxUnits) {
+        (1..maxUnits).map { count -> if (count == 1) "1 Unit" else "$count Units" }
+    }
+
+    val isFormValid = courseTitle.isNotBlank() && courseDescription.isNotBlank() && numberOfUnits in 1..maxUnits && difficultyLevel.isNotBlank()
     Scaffold(
         containerColor = AppColors.background,
         topBar = {
@@ -77,7 +92,7 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
                                 numUnits = numberOfUnits,
                                 difficulty = difficultyLevel,
                                 includeVideos = includeYouTube,
-                                provider ="Groq",
+                                provider = contentProvider,
                                 model =null
                             )
                             onGenerateOutline()
@@ -86,7 +101,8 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
                             .fillMaxWidth()
                             .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary),
+                        enabled = isFormValid
                     ) {
                         Icon(
                             imageVector = Icons.Default.AutoFixHigh,
@@ -153,8 +169,12 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
             FormSection(label = "Number of Units", hint = "Choose how many units your course should have") {
                 DropdownSelector(
                     label = "Select unit count",
-                    items = listOf("1 Units","2 Units","3 Units", "4 Units", "5 Units", "6 Units", "7 Units", "8 Units"),
-                    selectedText = "$numberOfUnits Units",
+                    items = unitItems,
+                    selectedText = if (numberOfUnits in 1..maxUnits) {
+                        if (numberOfUnits == 1) "1 Unit" else "$numberOfUnits Units"
+                    } else {
+                        "Select unit count"
+                    },
                     onItemSelected = {  numberOfUnits = it.trim().split(" ").first().toInt() }
                 )
             }
@@ -163,8 +183,8 @@ fun CreateCourseScreen(courseViewModel: CourseViewModel, onNavigateBack: () -> U
             FormSection(label = "Difficulty Level", hint = "Set the appropriate difficulty level for your target audience") {
                 DropdownSelector(
                     label = "Select difficulty",
-                    items = listOf("Beginner", "Intermediate", "Advanced", "Expert"),
-                    selectedText = difficultyLevel,
+                    items = listOf("Beginner", "Intermediate", "Advanced"),
+                    selectedText = if (difficultyLevel.isBlank()) "Select difficulty" else difficultyLevel,
                     onItemSelected = {difficultyLevel = it}
                 )
             }

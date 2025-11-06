@@ -1401,6 +1401,7 @@ package com.example.jetpackdemo
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -2158,6 +2159,36 @@ data class UiVideo(
 //            }
 //        }
 //    }
+
+
+//LaunchedEffect(fullCourseContent) {
+//    if (fullCourseContent is Resource.Success) {
+//        val courseData = (fullCourseContent as Resource.Success).data
+//        if (courseData != null) {
+//            // Find the first subtopic that has content (not null)
+//            val firstContentSubtopic = courseData.units
+//                .flatMap { it.subtopics }
+//                .firstOrNull { it.content != null }
+//
+//            if (firstContentSubtopic != null) {
+//                // ✅ Always update when new valid content appears
+//                currentContent = convertToSubTopicContent(firstContentSubtopic)
+//                selectedSubtopic = firstContentSubtopic
+//                hasContentToShow = true
+//
+//                // Stop polling once we have content
+//                courseViewModel.stopPolling()
+//            } else if (courseId != null && !allContentGenerated) {
+//                // 🟡 If still no content yet, start generation and polling
+//                courseViewModel.generateCourseContent(courseId!!)
+//                delay(2000)
+//                courseViewModel.startPollingGenerationStatus(courseId!!)
+//            }
+//        }
+//    }
+//}
+
+
 //
 //    // Update content when selection changes - but only if we're not in the middle of polling
 //    LaunchedEffect(selectedSubtopic) {
@@ -3001,8 +3032,20 @@ fun CourseContentScreen(
     val streamingSubtopicPreview by courseViewModel.currentStreamingSubtopic.collectAsState()
     val isPollingActive by courseViewModel.isPollingActive.collectAsState()
 
-    // old logic (kept for reference)
-    // val isGenerating = generationProgress != null || courseViewModel.isPollingActive()
+    val isStreamingProvider by courseViewModel.isStreamingProvider.collectAsState()
+
+    // Clear state when back is pressed or screen is disposed
+    DisposableEffect(Unit) {
+        onDispose {
+            courseViewModel.clearCourseState()
+        }
+    }
+
+    // Override the back button to clear state
+    BackHandler {
+        courseViewModel.clearCourseState()
+        onNavigateBack()
+    }
 
     // Reset when course changes
     // FIXED: Only fetch course content when NOT generating and courseId is available
@@ -3061,7 +3104,8 @@ fun CourseContentScreen(
                                     it.content.isNotEmpty() &&
                                     !it.content.trim().equals("[]", ignoreCase = true) &&
                                     !it.content.contains("Content is being generated") &&
-                                    it.content.trim().startsWith("[") // JSON array starts with [
+                                    (it.content.trim().startsWith("[") || it.content.trim().startsWith("{")) &&
+                                    parseGeneratedContent(it.content) != null
                         }
 
                     if (firstContent != null) {
@@ -3112,7 +3156,8 @@ fun CourseContentScreen(
                                 it.content.isNotEmpty() &&
                                 !it.content.trim().equals("[]", ignoreCase = true) &&
                                 !it.content.contains("Content is being generated") &&
-                                it.content.trim().startsWith("[")) {
+                                (it.content.trim().startsWith("[") || it.content.trim().startsWith("{")) &&
+                                parseGeneratedContent(it.content) != null) {
                                 convertToSubTopicContent(it)
                             } else {
                                 null
@@ -3222,21 +3267,28 @@ fun CourseContentScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             when {// FIXED: Show content if available, regardless of generation status
                 currentContent != null -> {
-                    Log.d("UI_DISPLAY", "📖 Displaying content: ${currentContent.title}")
                     CourseContentDisplay(
                         content = currentContent,
                         modifier = Modifier.padding(paddingValues)
                     )
                 }
-                // Only show generating state if we don't have content AND are generating
                 isGenerating -> {
-                    Log.d("UI_DISPLAY", "🔄 Displaying generating state")
-                    GeneratingStateWithStreaming(
-                        courseTitle = courseTitle,
-                        progress = generationProgress,
-                        viewModel = courseViewModel,
-                        modifier = Modifier.padding(paddingValues)
-                    )
+                    // Provider-aware generating state
+                    if (isStreamingProvider) {
+                        GeneratingStateWithStreaming(
+                            courseTitle = courseTitle,
+                            progress = generationProgress,
+                            viewModel = courseViewModel,
+                            modifier = Modifier.padding(paddingValues)
+                        )
+                    } else {
+                        // Simple loader for Cerebras (no streaming card)
+                        SimpleGeneratingState(
+                            courseTitle = courseTitle,
+                            progress = generationProgress,
+                            modifier = Modifier.padding(paddingValues)
+                        )
+                    }
                 }
                 fullCourseContent is Resource.Loading -> {
                     LoadingState(
@@ -3288,7 +3340,8 @@ fun CourseContentScreen(
                                         sub.content.isNotEmpty() &&
                                         !sub.content.trim().equals("[]", ignoreCase = true) &&
                                         !sub.content.contains("Content is being generated") &&
-                                        sub.content.trim().startsWith("[")
+                                        (sub.content.trim().startsWith("[") || sub.content.trim().startsWith("{")) &&
+                                        parseGeneratedContent(sub.content) != null
 
                                 if (hasValidContent) {
                                     selectedSubtopic = sub
@@ -3383,6 +3436,55 @@ fun GeneratingStateWithStreaming(
         }
     }
 }
+
+@Composable
+fun SimpleGeneratingState(
+    courseTitle: String,
+    progress: CourseViewModel.GenerationProgress?,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(
+                color = AppColors.primary,
+                strokeWidth = 6.dp
+            )
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "Generating: $courseTitle",
+                fontWeight = FontWeight.Bold,
+                color = AppColors.textPrimary
+            )
+
+            progress?.let {
+                Spacer(Modifier.height(16.dp))
+                LinearProgressIndicator(
+                    progress = { it.progress / 100f },
+                    modifier = Modifier.fillMaxWidth(0.8f),
+                    color = AppColors.primary,
+                    trackColor = AppColors.surface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "${it.generated}/${it.total} subtopics",
+                    color = AppColors.textSecondary
+                )
+                Text(
+                    "Processing: ${it.subtopic}",
+                    color = AppColors.textSecondary,
+                    fontSize = 14.sp
+                )
+            } ?: run {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Preparing batch generation...",
+                    color = AppColors.textSecondary
+                )
+            }
+        }
+    }
+}
+
 //@Composable
 //fun GeneratingStateWithStreaming(
 //    courseTitle: String,

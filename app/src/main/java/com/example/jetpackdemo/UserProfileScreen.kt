@@ -34,21 +34,17 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.example.jetpackdemo.ui.theme.AppColors
+import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserProfileScreen(navController: NavHostController) {
-    val context = LocalContext.current
-    val userPrefsManager = remember { UserPreferencesManager(context) }
+fun UserProfileScreen(navController: NavHostController, courseViewModel: CourseViewModel) {
 
-    // State for provider selections
-    var outlineProvider by rememberSaveable {
-        mutableStateOf(userPrefsManager.getOutlineProvider() ?: "Groq")
-    }
-    var contentProvider by rememberSaveable {
-        mutableStateOf(userPrefsManager.getContentProvider() ?: "Groq")
-    }
+    // Use ViewModel state instead of local state
+    val outlineProvider by courseViewModel.selectedOutlineProvider.collectAsState()
+    val contentProvider by courseViewModel.selectedContentProvider.collectAsState()
+
     var showSuccessToast by remember { mutableStateOf(false) }
 
     LaunchedEffect(showSuccessToast) {
@@ -88,11 +84,13 @@ fun UserProfileScreen(navController: NavHostController) {
                 ProviderSelectionSection(
                     outlineProvider = outlineProvider,
                     contentProvider = contentProvider,
-                    onOutlineProviderChange = { outlineProvider = it },
-                    onContentProviderChange = { contentProvider = it },
+                    onOutlineProviderChange = { newProvider ->
+                        courseViewModel.updateProviders(contentProvider, newProvider)
+                    },
+                    onContentProviderChange = { newProvider ->
+                        courseViewModel.updateProviders(newProvider, outlineProvider)
+                    },
                     onSaveClick = {
-                        userPrefsManager.saveOutlineProvider(outlineProvider)
-                        userPrefsManager.saveContentProvider(contentProvider)
                         showSuccessToast = true
                     }
                 )
@@ -100,7 +98,7 @@ fun UserProfileScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(32.dp))
                 AccountActionsSection(
                     onLogoutClick = {
-                        userPrefsManager.clearAll()
+                        courseViewModel.clearPrefManager();
                         navController.navigate("welcome") {
                             popUpTo("main") { inclusive = true }
                         }
@@ -320,66 +318,10 @@ fun ProfileHeader() {
     }
 }
 
-@Composable
-fun ByoApiKeySection(
-    apiKey: String,
-    isApiKeyVisible: Boolean,
-    onApiKeyChange: (String) -> Unit,
-    onVisibilityChange: () -> Unit,
-    onSaveClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Your Gemini API Key", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Save your own API key to generate courses without using the app's default credits. Your key is stored securely on this device and is never sent to our servers.",
-                fontSize = 14.sp,
-                color = AppColors.textSecondary,
-                lineHeight = 20.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = onApiKeyChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Enter your API Key") },
-                singleLine = true,
-                visualTransformation = if (isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    val icon = if (isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
-                    IconButton(onClick = onVisibilityChange) {
-                        Icon(icon, contentDescription = "Toggle visibility", tint = AppColors.textSecondary)
-                    }
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = AppColors.primary,
-                    unfocusedIndicatorColor = AppColors.textSecondary.copy(alpha = 0.4f),
-                    focusedContainerColor = AppColors.surface,
-                    unfocusedContainerColor = AppColors.surface,
-                    cursorColor = AppColors.primary,
-                    focusedLabelColor = AppColors.primary,
-                )
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onSaveClick,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
-            ) {
-                Text("Save Key", color = AppColors.onPrimary)
-            }
-        }
-    }
-}
 
 @Preview(showBackground = true, device = "id:pixel_4")
 @Composable
 fun UserProfileScreenPreview() {
-    UserProfileScreen(navController = rememberNavController())
+    // Preview without a real ViewModel instance
+    // UserProfileScreen(navController = rememberNavController(), courseViewModel = ...)
 }

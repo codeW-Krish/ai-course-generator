@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    const val BASE_URL = "https://52cabce422fb.ngrok-free.app/" // Use this for Android Emulator
+    const val BASE_URL = "https://758771a91b9a.ngrok-free.app/" // Use this for Android Emulator
 
     // Shared logging interceptor
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
