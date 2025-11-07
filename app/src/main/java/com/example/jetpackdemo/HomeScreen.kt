@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +30,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 import com.example.jetpackdemo.ui.theme.AppColors
+import com.example.jetpackdemo.viewmodels.AdminViewModel
+import com.example.jetpackdemo.viewmodels.CourseViewModel
 
 // --- Data Models ---
 data class Course(
@@ -53,7 +55,7 @@ data class BottomNavItem(val title: String, val route: String, val icon: ImageVe
 
 // --- Main Screen with Bottom Navigation ---
 @Composable
-fun MainScreen(navController: NavHostController, courseViewModel: CourseViewModel) {
+fun MainScreen(navController: NavHostController, courseViewModel: CourseViewModel, adminViewModel: AdminViewModel? = null) {
     val bottomBarNavController = rememberNavController()
     Scaffold(
         bottomBar = { HomeBottomNavigation(navController = bottomBarNavController) }
@@ -62,7 +64,8 @@ fun MainScreen(navController: NavHostController, courseViewModel: CourseViewMode
             BottomNavGraph(
                 bottomBarNavController = bottomBarNavController,
                 appNavController = navController,
-                courseViewModel = courseViewModel
+                courseViewModel = courseViewModel,
+                adminViewModel = adminViewModel
             )
         }
     }
@@ -70,7 +73,8 @@ fun MainScreen(navController: NavHostController, courseViewModel: CourseViewMode
 
 // --- Navigation Graph for the Bottom Bar Tabs ---
 @Composable
-fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: NavHostController, courseViewModel: CourseViewModel) {
+fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: NavHostController, courseViewModel: CourseViewModel, adminViewModel: AdminViewModel? = null) {
+    val userRole by courseViewModel.userRole.collectAsState()
     NavHost(navController = bottomBarNavController, startDestination = "home") {
         composable("home") {
             HomeScreen(
@@ -83,7 +87,12 @@ fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: 
             }
         }
         composable("profile") {
-            UserProfileScreen(navController = appNavController, courseViewModel = courseViewModel)
+            // === PASS ADMIN VIEWMODEL ONLY IF ADMIN ===
+            UserProfileScreen(
+                navController = appNavController,
+                courseViewModel = courseViewModel,
+                adminViewModel = adminViewModel
+            )
         }
     }
 }

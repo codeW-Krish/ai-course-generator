@@ -1,6 +1,7 @@
 package com.example.jetpackdemo.data.repository
 
 import com.example.jetpackdemo.data.api.ApiService
+import com.example.jetpackdemo.data.api.GenericResponse
 import com.example.jetpackdemo.data.model.*
 import retrofit2.Response
 
@@ -42,4 +43,39 @@ class CourseRepository(private val api: ApiService) {
     suspend fun updateOutlineBeforeGenerationConetent(courseId: String, outline: CourseOutline, regenerate: Boolean = false): Response<GenerateOutlineResponse>{
         return api.updateCourseOutline(courseId, outline, regenerate);
     }
+
+    // Admin methods
+    suspend fun getAllCoursesAdmin(): Response<CoursesResponse> {
+        return api.getAllCoursesAdmin()
+    }
+
+    suspend fun deleteCourseAdmin(courseId: String): Response<GenericResponse> {
+        return api.deleteCourseAdmin(courseId)
+    }
+
+    suspend fun getGlobalSettings(): Response<GlobalSettingsResponse> {
+        return api.getGlobalSettings()
+    }
+
+    suspend fun updateGlobalSetting(key: String, value: String): Response<GenericResponse> {
+        return api.updateGlobalSetting(key, mapOf("value" to value))
+    }
+
+    suspend fun updateAvailableProviders(providers: List<String>): Response<GenericResponse> {
+        return api.updateAvailableProviders(UpdateProvidersRequest(providers))
+    }
+
+    suspend fun updateDefaultProviders(outlineProvider: String, contentProvider: String): Response<GenericResponse> {
+        return api.updateDefaultProviders(UpdateDefaultProvidersRequest(outlineProvider, contentProvider))
+    }
+
+    // Public settings methods
+    suspend fun getAvailableProviders(): Response<AvailableProvidersResponse> {
+        return api.getAvailableProviders()
+    }
+
+    suspend fun getDefaultProviders(): Response<DefaultProvidersResponse> {
+        return api.getDefaultProviders()
+    }
+
 }

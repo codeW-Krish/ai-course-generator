@@ -17,8 +17,8 @@ import androidx.navigation.NavHostController
 import com.example.jetpackdemo.data.model.Course
 import com.example.jetpackdemo.data.model.CoursesResponse
 import com.example.jetpackdemo.ui.theme.AppColors
-import com.example.jetpackdemo.ui.viewmodel.Resource
 import com.example.jetpackdemo.viewmodels.AdminViewModel
+import com.example.jetpackdemo.viewmodels.Resource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,15 +26,18 @@ fun AdminCoursesScreen(
     navController: NavHostController,
     adminViewModel: AdminViewModel
 ) {
-    // Double-check: non-admins should never reach here
-    if (!adminViewModel.isAdmin) {
-        LaunchedEffect(Unit) {
-            navController.popBackStack()
-        }
-        return
+    // === LOAD COURSES ON APPEAR ===
+    LaunchedEffect(Unit) {
+        adminViewModel.loadAllCoursesAdmin()
     }
 
-    val adminCourses by adminViewModel.adminCourses.collectAsState()
+    // === OBSERVE STATE ===
+    val adminCoursesState by adminViewModel.adminCourses.collectAsState()
+
+    // === EXTRACT DATA ===
+    val courses = (adminCoursesState as? Resource.Success<CoursesResponse>)?.data?.courses ?: emptyList()
+    val isLoading = adminCoursesState is Resource.Loading
+    val error = (adminCoursesState as? Resource.Error)?.message
 
     Scaffold(
         topBar = {
@@ -44,47 +47,36 @@ fun AdminCoursesScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppColors.textPrimary)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                }
             )
         }
-    ) { paddingValues ->
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-        ) {
-            when (adminCourses) {
-                is Resource.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+    ) { padding ->
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AppColors.primary)
+                }
+            }
+            error != null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Error: $error", color = Color.Red)
+                }
+            }
+            courses.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No courses found", color = AppColors.textSecondary)
+                }
+            }
+            else -> {
+                LazyColumn(modifier = Modifier.padding(padding)) {
+                    items(courses) { course ->
+                        AdminCourseCard(
+                            course = course,
+                            onDelete = { adminViewModel.deleteCourse(course.id) }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
-                is Resource.Success -> {
-                    val courses = (adminCourses as Resource.Success<CoursesResponse>).data!!.courses
-                    if (courses.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No courses found", color = AppColors.textSecondary)
-                        }
-                    } else {
-                        LazyColumn(modifier = Modifier.padding(16.dp)) {
-                            items(courses) { course ->
-                                AdminCourseItem(
-                                    course = course,
-                                    onDelete = {
-                                        adminViewModel.deleteCourse(course.id)
-                                    }
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
-                        }
-                    }
-                }
-                is Resource.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = "Error: ${(adminCourses as Resource.Error<CoursesResponse>).message}", color = Color.Red)
-                    }
-                }
-                else -> Unit
             }
         }
     }
@@ -92,12 +84,14 @@ fun AdminCoursesScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminCourseItem(
+fun AdminCourseCard(
     course: Course,
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -110,7 +104,7 @@ fun AdminCourseItem(
                 color = AppColors.textPrimary
             )
             Text(
-                text = "By: ${course.createdBy}",  // ← Use createdBy (UUID)
+                text = "By: ${course.createdBy}",
                 fontSize = 14.sp,
                 color = AppColors.textSecondary
             )

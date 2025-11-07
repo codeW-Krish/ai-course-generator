@@ -1,4 +1,4 @@
-package com.example.jetpackdemo.ui.viewmodel
+package com.example.jetpackdemo.viewmodels
 
 import android.app.Application
 import android.util.Log
@@ -26,8 +26,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import okio.Buffer
-import java.io.IOException
+import com.example.jetpackdemo.data.model.DefaultProvidersResponse
+
 
 // A sealed class to wrap state (you can reuse this for all API calls)
 sealed class Resource<T>(
@@ -132,21 +132,107 @@ class CourseViewModel(
     val isStreamingProvider = _isStreamingProvider.asStateFlow()
 
 
+
     // ADD THIS INIT BLOCK (place it after all property declarations):
+    // Add these state flows to your CourseViewModel
+    private val _availableProviders = MutableStateFlow<List<String>>(emptyList())
+    val availableProviders = _availableProviders.asStateFlow()
+
+    private val _defaultProviders = MutableStateFlow<DefaultProvidersResponse?>(null)
+    val defaultProviders = _defaultProviders.asStateFlow()
+
+    private val _userRole = MutableStateFlow("user")
+    val userRole = _userRole.asStateFlow()
+
+    // Update the init block
     init {
         viewModelScope.launch {
-            // Load providers from preferences
-            val contentProvider = userPrefsManager.getContentProvider() ?: "Groq"
-            val outlineProvider = userPrefsManager.getOutlineProvider() ?: "Groq"
+            // Load user role
+            _userRole.value = userPrefsManager.getUserRole()
 
-            _selectedContentProvider.value = contentProvider
-            _selectedOutlineProvider.value = outlineProvider
-            _isStreamingProvider.value = !contentProvider.equals("cerebras", ignoreCase = true)
+            // Load available providers
+            loadAvailableProviders()
 
-            Log.d("VIEWMODEL", "Loaded providers - Content: $contentProvider, Outline: $outlineProvider")
+            // Load default providers
+            loadDefaultProviders()
+
+            // Validate and fix user's providers against available list
+            validateAndFixUserProviders()
+
+            // Load user's personal providers
+            val contentProvider = userPrefsManager.getContentProvider()
+            val outlineProvider = userPrefsManager.getOutlineProvider()
+
+            _selectedContentProvider.value = contentProvider ?: _defaultProviders.value?.content ?: "Groq"
+            _selectedOutlineProvider.value = outlineProvider ?: _defaultProviders.value?.outline ?: "Groq"
+            _isStreamingProvider.value = !_selectedContentProvider.value.equals("cerebras", ignoreCase = true)
+
+            Log.d("VIEWMODEL", "Loaded providers - Content: ${_selectedContentProvider.value}, Outline: ${_selectedOutlineProvider.value}")
         }
     }
 
+    // Add these methods to your CourseViewModel
+    fun loadAvailableProviders() {
+        viewModelScope.launch {
+            try {
+                val response = repository.getAvailableProviders()
+                if (response.isSuccessful) {
+                    _availableProviders.value = response.body()?.providers ?: emptyList()
+                }
+            } catch (e: Exception) {
+                Log.e("VIEWMODEL", "Failed to load available providers", e)
+            }
+        }
+    }
+
+    fun loadDefaultProviders() {
+        viewModelScope.launch {
+            try {
+                val response = repository.getDefaultProviders()
+                if (response.isSuccessful) {
+                    _defaultProviders.value = response.body()
+                }
+            } catch (e: Exception) {
+                Log.e("VIEWMODEL", "Failed to load default providers", e)
+            }
+        }
+    }
+
+    private fun validateAndFixUserProviders() {
+        viewModelScope.launch {
+            val available = _availableProviders.value
+            if (available.isEmpty()) return@launch // Wait for load
+
+            val needsFix = userPrefsManager.validateAndFixProviders(available)
+            if (needsFix) {
+                Log.d("VIEWMODEL", "User providers were invalid → reset to defaults")
+
+                // Force UI to use defaults
+                val defaultContent = _defaultProviders.value?.content ?: "Groq"
+                val defaultOutline = _defaultProviders.value?.outline ?: "Groq"
+
+                _selectedContentProvider.value = defaultContent
+                _selectedOutlineProvider.value = defaultOutline
+                _isStreamingProvider.value = !defaultContent.equals("cerebras", ignoreCase = true)
+
+                // Optionally save defaults so next launch is clean
+                userPrefsManager.saveContentProvider(defaultContent)
+                userPrefsManager.saveOutlineProvider(defaultOutline)
+            }
+        }
+    }
+
+    fun updateUserRole(role: String) {
+        userPrefsManager.saveUserRole(role)
+        _userRole.value = role
+    }
+
+    fun reloadUserRole() {
+        viewModelScope.launch {
+            _userRole.value = userPrefsManager.getUserRole()
+            Log.d("CourseVM", "Reloaded role: ${_userRole.value}")
+        }
+    }
 
 
     data class GenerationProgress(
@@ -158,138 +244,6 @@ class CourseViewModel(
     )
 
     // Add this function
-//    fun startStreamingGeneration(courseId: String, provider: String? = null, model: String? = null) {
-//        Log.d("STREAMING", "STARTING for courseId: $courseId, provider: $provider, model: $model")
-//        viewModelScope.launch {
-//            _currentStreamingText.value = ""
-//            _currentStreamingSubtopic.value = null
-//            _isGeneratingContent.value = true
-//            _generationStartTime.value = System.currentTimeMillis()
-//
-//            val client = RetrofitClient.getOkHttpClientForSSE(context)
-//
-//            // BODY JSON
-//            val requestBody = """
-//            {
-//                "provider": "${provider ?: "Groq"}",
-//                ${if (model != null) "\"model\": \"$model\"" else ""}
-//            }
-//        """.trimIndent()
-//
-//            val body = requestBody.toRequestBody("application/json".toMediaType())
-//
-//            val request = Request.Builder()
-//                .url("${RetrofitClient.BASE_URL}api/courses/$courseId/generate-content-stream")
-//                .post(body)
-//                .build()
-//
-//            Log.d("STREAMING", "SSE URL: ${request.url}")
-//            Log.d("STREAMING", "Request Body: $requestBody")
-//
-//            client.newCall(request).enqueue(object : Callback {
-//                override fun onResponse(call: Call, response: Response) {
-//                    Log.d("STREAMING", "SSE Response: ${response.code}")
-//                    if (!response.isSuccessful) {
-//                        _streamingEvents.tryEmit(SSEEvent(type = "error", message = "HTTP ${response.code}"))
-//                        return
-//                    }
-//
-//                    response.body?.byteStream()?.bufferedReader()?.use { reader ->
-//                        var line: String?
-////                        while (reader.readLine().also { line = it } != null) {
-////                            Log.d("SSE_RAW", line ?: "null")
-////                            if (line!!.startsWith("data:")) {
-////                                val json = line!!.removePrefix("data:").trim()
-////                                try {
-////                                    val event = Gson().fromJson(json, SSEEvent::class.java)
-////                                    Log.d("SSE_PARSED", event.toString())
-////                                    _streamingEvents.tryEmit(event)
-////                                } catch (e: Exception) {
-////                                    Log.e("SSE", "Parse error: $json", e)
-////                                    _streamingEvents.tryEmit(SSEEvent(type = "error", message = "Parse error"))
-////                                }
-////                            }
-////                        }
-//                        // Inside the reader loop
-//                        while (reader.readLine().also { line = it } != null) {
-//                            Log.d("SSE_RAW", line ?: "null")
-//                            if (line!!.startsWith("data:")) {
-//                                val json = line!!.removePrefix("data:").trim()
-//                                if (json == "[DONE]") continue
-//
-//                                try {
-//                                    val event = Gson().fromJson(json, SSEEvent::class.java)
-//                                    Log.d("SSE_PARSED", event.toString())
-//
-//                                    when (event.type) {
-//                                        "chunk" -> {
-//                                            _currentStreamingSubtopic.value = event.subtopic
-//                                            _currentStreamingText.value += event.chunk
-//                                        }
-//                                        "progress" -> {
-//                                            updateProgress(event)
-//                                            // Reset text buffer for next subtopic
-//                                            if (event.subtopic != _currentStreamingSubtopic.value) {
-//                                                _currentStreamingText.value = ""
-//                                                _currentStreamingSubtopic.value = event.subtopic
-//                                            }
-//                                        }
-//                                        "complete" -> {
-//                                            _streamingEvents.tryEmit(event)
-//                                            stopStreaming()
-//                                            viewModelScope.launch(Dispatchers.Main) {
-//                                                getFullCourseContent(courseId!!)
-//                                            }
-//                                        }
-//                                        else -> _streamingEvents.tryEmit(event)
-//                                    }
-//                                } catch (e: Exception) {
-//                                    Log.e("SSE", "Parse error: $json", e)
-//                                }
-//                            }
-//                        }
-//                    }
-//                    Log.d("STREAMING", "Stream ended")
-//                   _streamingEvents.tryEmit(SSEEvent(type = "complete"))
-//                }
-//
-//                override fun onFailure(call: Call, e: IOException) {
-//                    Log.e("STREAMING", "SSE Failed: ${e.message}", e)
-//                    _streamingEvents.tryEmit(SSEEvent(type = "error", message = e.message))
-//                }
-//            })
-//        }
-//    }
-
-//    private var pollingJob: Job? = null
-
-    //    fun startPollingFullContent(courseId: String) {
-//        pollingJob?.cancel()
-//        pollingJob = viewModelScope.launch {
-//            while (isActive) {
-//                try {
-//                    val response = repository.getFullCourse(courseId)
-//                    if (response.isSuccessful && response.body() != null) {
-//                        val data = response.body()!!
-//                        val allGenerated = data.units.flatMap { it.subtopics }
-//                            .all { it.content != null && it.contentGeneratedAt != null }
-//
-//                        _fullCourseContent.value = Resource.Success(data)
-//
-//                        if (allGenerated) {
-//                            stopStreaming()
-//                            break
-//                        }
-//                    }
-//                } catch (e: Exception) {
-//                    Log.e("POLLING", "Failed to poll", e)
-//                }
-//                delay(2000)
-//            }
-//        }
-//    }
-// Add this to track polling state
-
 
 
     // FIXED: Proper polling logic with correct content detection
@@ -355,117 +309,6 @@ class CourseViewModel(
 
     fun isPollingActive(): Boolean = _isPollingActive.value
 
-
-    //    fun startStreamingGeneration(courseId: String, provider: String? = null, model: String? = null) {
-//        Log.d("STREAMING", "STARTING for courseId: $courseId, provider: $provider, model: $model")
-//        viewModelScope.launch {
-//            // Reset state
-//            _currentStreamingText.value = ""
-//            _currentStreamingSubtopic.value = null
-//            _isGeneratingContent.value = true
-//            _generationStartTime.value = System.currentTimeMillis()
-//
-//            val client = RetrofitClient.getOkHttpClientForSSE(context)
-//
-//            // FIXED: No trailing comma
-//            val requestBody = buildString {
-//                append("{\n")
-//                append("  \"provider\": \"${provider ?: "Groq"}\"")
-//                if (model != null) {
-//                    append(",\n  \"model\": \"$model\"")
-//                }
-//                append("\n}")
-//            }
-//
-//            val body = requestBody.toRequestBody("application/json".toMediaType())
-//
-//            val request = Request.Builder()
-//                .url("${RetrofitClient.BASE_URL}api/courses/$courseId/generate-content-stream")
-//                .post(body)
-//                .build()
-//
-//            Log.d("STREAMING", "SSE URL: ${request.url}")
-//            Log.d("STREAMING", "Request Body: $requestBody")
-//
-//            client.newCall(request).enqueue(object : Callback {
-//                override fun onResponse(call: Call, response: Response) {
-//                    Log.d("STREAMING", "SSE Response: ${response.code}")
-//                    if (!response.isSuccessful) {
-//                        viewModelScope.launch {
-//                            _streamingEvents.tryEmit(SSEEvent(type = "error", message = "HTTP ${response.code}"))
-//                            stopStreaming()
-//                        }
-//                        return
-//                    }
-//
-//                    response.body?.byteStream()?.bufferedReader()?.use { reader ->
-//                        var line: String?
-//                        while (reader.readLine().also { line = it } != null) {
-//                            Log.d("SSE_RAW", line ?: "null")
-//                            if (line!!.startsWith("data:")) {
-//                                val json = line!!.removePrefix("data:").trim()
-//                                if (json == "[DONE]") continue
-//
-//                                try {
-//                                    val event = Gson().fromJson(json, SSEEvent::class.java)
-//                                    Log.d("SSE_PARSED", event.toString())
-//
-//                                    when (event.type) {
-//                                        "chunk" -> {
-//                                            //_currentStreamingSubtopic.value = event.subtopic
-//                                            //_currentStreamingText.value += event.chunk.orEmpty()
-//                                            val chunk = event.chunk.orEmpty()
-//                                            _currentStreamingSubtopic.value = event.subtopic
-//
-//                                            // Only update if we have non-empty content
-//                                            if (chunk.isNotBlank()) {
-//                                                _currentStreamingText.value += chunk
-//                                                // This will automatically trigger UI updates
-//                                            }
-//                                        }
-//                                        "progress" -> {
-//                                            updateProgress(event)
-//                                            if (event.subtopic != _currentStreamingSubtopic.value) {
-//                                                _currentStreamingText.value = ""
-//                                                _currentStreamingSubtopic.value = event.subtopic
-//                                            }
-//                                        }
-//                                        "complete" -> {
-//                                            _streamingEvents.tryEmit(event)
-//                                            stopStreaming()
-//                                            // FIXED: Safe courseId + launch
-//                                            startPollingFullContent(courseId)
-//                                        }
-//                                        else -> _streamingEvents.tryEmit(event)
-//                                    }
-//                                } catch (e: Exception) {
-//                                    Log.e("SSE", "Parse error: $json", e)
-//                                    viewModelScope.launch {
-//                                        _streamingEvents.tryEmit(SSEEvent(type = "error", message = "Parse error"))
-//                                        stopStreaming()
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//
-//                    Log.d("STREAMING", "Stream ended")
-//                    viewModelScope.launch {
-//                        _streamingEvents.tryEmit(SSEEvent(type = "complete"))
-//                        stopStreaming()
-//                    }
-//                }
-//
-//                override fun onFailure(call: Call, e: IOException) {
-//                    Log.e("STREAMING", "SSE Failed: ${e.message}", e)
-//                    viewModelScope.launch {
-//                        _streamingEvents.tryEmit(SSEEvent(type = "error", message = e.message))
-//                        stopStreaming()
-//                    }
-//                }
-//            })
-//        }
-//    }
 
     // 1000% WORKING
     fun startStreamingGeneration(courseId: String, provider: String? = null, model: String? = null) {
@@ -939,8 +782,20 @@ class CourseViewModel(
     /**
      * Update providers when user changes them in settings
      */
+    // Update the updateProviders method to validate against available providers
     fun updateProviders(contentProvider: String, outlineProvider: String) {
         viewModelScope.launch {
+            // Validate against available providers
+            if (!_availableProviders.value.contains(contentProvider)) {
+                Log.e("VIEWMODEL", "Invalid content provider: $contentProvider")
+                return@launch
+            }
+
+            if (!_availableProviders.value.contains(outlineProvider)) {
+                Log.e("VIEWMODEL", "Invalid outline provider: $outlineProvider")
+                return@launch
+            }
+
             _selectedContentProvider.value = contentProvider
             _selectedOutlineProvider.value = outlineProvider
             _isStreamingProvider.value = !contentProvider.equals("cerebras", ignoreCase = true)
@@ -949,7 +804,23 @@ class CourseViewModel(
             userPrefsManager.saveContentProvider(contentProvider)
             userPrefsManager.saveOutlineProvider(outlineProvider)
 
-            Log.d("VIEWMODEL", "✅ Updated providers - Content: $contentProvider, Outline: $outlineProvider")
+            Log.d(
+                "VIEWMODEL",
+                "✅ Updated providers - Content: $contentProvider, Outline: $outlineProvider"
+            )
+        }
+    }
+
+    fun clearUserData() {
+        viewModelScope.launch {
+            userPrefsManager.clearAll()
+            clearCourseState()
+            clearOutlineState()
+            _selectedContentProvider.value = "Groq"
+            _selectedOutlineProvider.value = "Groq"
+            _isStreamingProvider.value = true
+            _userRole.value = "user"
+            Log.d("VIEWMODEL", "All user data cleared")
         }
     }
 
@@ -1213,6 +1084,7 @@ class CourseViewModel(
             }
         }
     }
+
 
 
 }

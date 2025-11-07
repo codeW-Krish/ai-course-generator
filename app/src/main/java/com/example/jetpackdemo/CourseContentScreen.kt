@@ -1432,8 +1432,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.jetpackdemo.data.model.*
 import com.example.jetpackdemo.ui.theme.AppColors
-import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
-import com.example.jetpackdemo.ui.viewmodel.Resource
+import com.example.jetpackdemo.viewmodels.CourseViewModel
+import com.example.jetpackdemo.viewmodels.Resource
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.delay

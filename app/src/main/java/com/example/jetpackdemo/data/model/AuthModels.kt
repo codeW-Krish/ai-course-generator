@@ -4,10 +4,16 @@ import com.google.gson.annotations.SerializedName
 data class User(
     val id: String,
     val email: String,
+    val username: String,
+    val role: String = "user" // Add role with default
+)
+
+data class Users(
+    val id: String,
     val username: String
 )
 
-// The complete response from a successful login or register call.
+// AuthResponse remains the same but User now includes role
 data class AuthResponse(
     val message: String,
     val user: User,
@@ -15,17 +21,43 @@ data class AuthResponse(
     val refreshToken: String
 )
 
-// The response from a successful token refresh.
-// NOTE: Your backend sends 'newAccessToken' and 'newRefreshToken'.
-// We use @SerializedName to map these to our standard field names.
-// You will need to add the 'com.google.code.gson:gson' dependency for this.
-
+// RefreshResponse remains the same
 data class RefreshResponse(
     val message: String,
     @SerializedName("newAccessToken")
     val accessToken: String,
     @SerializedName("newRefreshToken")
     val refreshToken: String
+)
+
+// Add new data classes for admin features
+data class GlobalSettingsResponse(
+    val settings: List<GlobalSetting>
+)
+
+data class GlobalSetting(
+    val key: String,
+    val value: String,
+    val description: String?,
+    val updated_at: String?
+)
+
+data class AvailableProvidersResponse(
+    val providers: List<String>
+)
+
+data class DefaultProvidersResponse(
+    val outline: String,
+    val content: String
+)
+
+data class UpdateProvidersRequest(
+    val providers: List<String>
+)
+
+data class UpdateDefaultProvidersRequest(
+    val outlineProvider: String,
+    val contentProvider: String
 )
 
 // Data class for the /auth/register endpoint request body.

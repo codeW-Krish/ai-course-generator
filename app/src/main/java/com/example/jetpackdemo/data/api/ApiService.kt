@@ -1,21 +1,27 @@
 package com.example.jetpackdemo.data.api
 
 import com.example.jetpackdemo.data.model.AuthResponse
+import com.example.jetpackdemo.data.model.AvailableProvidersResponse
 import com.example.jetpackdemo.data.model.ContentGenerationStatusResponse
 import com.example.jetpackdemo.data.model.CourseFullResponse
 import com.example.jetpackdemo.data.model.CourseOutline
 import com.example.jetpackdemo.data.model.CoursesResponse
+import com.example.jetpackdemo.data.model.DefaultProvidersResponse
 import com.example.jetpackdemo.data.model.EnrollResponse
 import com.example.jetpackdemo.data.model.GenerateOutlineRequest
 import com.example.jetpackdemo.data.model.GenerateOutlineResponse
 import com.example.jetpackdemo.data.model.GeneratedSubtopicContent
 import com.example.jetpackdemo.data.model.GenerationStatusResponse
+import com.example.jetpackdemo.data.model.GlobalSettingsResponse
 import com.example.jetpackdemo.data.model.LoginRequest
 import com.example.jetpackdemo.data.model.RefreshRequest
 import com.example.jetpackdemo.data.model.RefreshResponse
 import com.example.jetpackdemo.data.model.RegisterRequest
+import com.example.jetpackdemo.data.model.UpdateDefaultProvidersRequest
+import com.example.jetpackdemo.data.model.UpdateProvidersRequest
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -81,5 +87,38 @@ interface ApiService {
     @GET("/api/courses/{id}/full")
     suspend fun getFullCourse(@Path("id") courseId: String): Response<CourseFullResponse>
 
+    // === ADMIN ENDPOINTS ===
+    @GET("/api/admin/courses")
+    suspend fun getAllCoursesAdmin(): Response<CoursesResponse>
+
+    @DELETE("/api/admin/courses/{id}")
+    suspend fun deleteCourseAdmin(@Path("id") courseId: String): Response<GenericResponse>
+
+    @GET("/api/admin/settings")
+    suspend fun getGlobalSettings(): Response<GlobalSettingsResponse>
+
+    @PUT("/api/admin/settings/{key}")
+    suspend fun updateGlobalSetting(
+        @Path("key") key: String,
+        @Body request: Map<String, String>
+    ): Response<GenericResponse>
+
+    @PUT("/api/admin/providers/available")
+    suspend fun updateAvailableProviders(@Body request: UpdateProvidersRequest): Response<GenericResponse>
+
+    @PUT("/api/admin/providers/default")
+    suspend fun updateDefaultProviders(@Body request: UpdateDefaultProvidersRequest): Response<GenericResponse>
+
+    // === PUBLIC SETTINGS ENDPOINTS ===
+    @GET("/api/settings/providers/available")
+    suspend fun getAvailableProviders(): Response<AvailableProvidersResponse>
+
+    @GET("/api/settings/providers/default")
+    suspend fun getDefaultProviders(): Response<DefaultProvidersResponse>
+
+
 }
 
+data class GenericResponse(
+    val message: String
+)

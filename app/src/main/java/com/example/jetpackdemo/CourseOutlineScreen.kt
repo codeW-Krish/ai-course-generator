@@ -31,9 +31,9 @@ import androidx.compose.ui.unit.sp
 import com.example.jetpackdemo.data.model.CourseOutline
 import com.example.jetpackdemo.data.model.OutlineUnit
 import com.example.jetpackdemo.ui.theme.AppColors
-import com.example.jetpackdemo.ui.viewmodel.CourseViewModel
 
-import com.example.jetpackdemo.ui.viewmodel.Resource
+import com.example.jetpackdemo.viewmodels.CourseViewModel
+import com.example.jetpackdemo.viewmodels.Resource
 
 // --- Data Classes with unique IDs for state management ---
 data class SubTopic(val id: Int, var title: String)

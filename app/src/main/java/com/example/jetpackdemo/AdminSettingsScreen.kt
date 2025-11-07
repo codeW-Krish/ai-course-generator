@@ -30,8 +30,8 @@ import com.example.jetpackdemo.data.api.GenericResponse
 import com.example.jetpackdemo.data.model.AvailableProvidersResponse
 import com.example.jetpackdemo.data.model.DefaultProvidersResponse
 import com.example.jetpackdemo.ui.theme.AppColors
-import com.example.jetpackdemo.ui.viewmodel.Resource
 import com.example.jetpackdemo.viewmodels.AdminViewModel
+import com.example.jetpackdemo.viewmodels.Resource
 import kotlinx.coroutines.delay
 
 

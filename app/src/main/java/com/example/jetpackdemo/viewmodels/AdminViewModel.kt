@@ -7,17 +7,15 @@ import com.example.jetpackdemo.data.api.GenericResponse
 import com.example.jetpackdemo.data.model.*
 import com.example.jetpackdemo.data.repository.CourseRepository
 import com.example.jetpackdemo.shared_pref.UserPreferencesManager
-import com.example.jetpackdemo.ui.viewmodel.Resource
-import dagger.hilt.android.lifecycle.HiltViewModel
+import com.example.jetpackdemo.viewmodels.Resource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 
-@HiltViewModel
-class AdminViewModel @Inject constructor(
+
+class AdminViewModel(
     application: Application,
     private val repository: CourseRepository
 ) : AndroidViewModel(application) {
