@@ -8,15 +8,19 @@ import com.example.jetpackdemo.data.model.CourseOutline
 import com.example.jetpackdemo.data.model.CoursesResponse
 import com.example.jetpackdemo.data.model.DefaultProvidersResponse
 import com.example.jetpackdemo.data.model.EnrollResponse
+import com.example.jetpackdemo.data.model.FullSearchResponse
 import com.example.jetpackdemo.data.model.GenerateOutlineRequest
 import com.example.jetpackdemo.data.model.GenerateOutlineResponse
 import com.example.jetpackdemo.data.model.GeneratedSubtopicContent
 import com.example.jetpackdemo.data.model.GenerationStatusResponse
 import com.example.jetpackdemo.data.model.GlobalSettingsResponse
 import com.example.jetpackdemo.data.model.LoginRequest
+import com.example.jetpackdemo.data.model.NoteResponse
+import com.example.jetpackdemo.data.model.ProgressItem
 import com.example.jetpackdemo.data.model.RefreshRequest
 import com.example.jetpackdemo.data.model.RefreshResponse
 import com.example.jetpackdemo.data.model.RegisterRequest
+import com.example.jetpackdemo.data.model.SearchResponse
 import com.example.jetpackdemo.data.model.UpdateDefaultProvidersRequest
 import com.example.jetpackdemo.data.model.UpdateProvidersRequest
 import retrofit2.Response
@@ -116,6 +120,31 @@ interface ApiService {
     @GET("/api/settings/providers/default")
     suspend fun getDefaultProviders(): Response<DefaultProvidersResponse>
 
+
+    @GET("/api/courses/search")
+    suspend fun searchCourses(@Query("query") query: String): Response<SearchResponse>
+
+    @GET("/api/courses/search/full")
+    suspend fun searchFull(
+        @Query("query") query: String,
+        @Query("difficulty") difficulty: String? = null,
+        @Query("sortBy") sortBy: String? = null
+    ): Response<FullSearchResponse>
+
+    @DELETE("/api/courses/{id}")
+    suspend fun deleteCourse(@Path("id") id: String): Response<GenericResponse>
+
+    @POST("/api/subtopics/{id}/notes")
+    suspend fun saveNote(@Path("id") id: String, @Body body: Map<String, String>): Response<GenericResponse>
+
+    @GET("/api/subtopics/{id}/notes")
+    suspend fun getNote(@Path("id") id: String): Response<NoteResponse>
+
+    @POST("/api/subtopics/{id}/complete")
+    suspend fun markComplete(@Path("id") id: String, @Body body: Map<String, Boolean>): Response<GenericResponse>
+
+    @GET("/api/courses/{id}/progress")
+    suspend fun getProgress(@Path("id") id: String): Response<List<ProgressItem>>
 
 }
 

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import android.content.Context
+import androidx.compose.runtime.mutableStateMapOf
 import com.example.jetpackdemo.data.model.SSEEvent
 import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.google.gson.Gson
@@ -144,6 +145,9 @@ class CourseViewModel(
     private val _userRole = MutableStateFlow("user")
     val userRole = _userRole.asStateFlow()
 
+
+
+
     // Update the init block
     init {
         viewModelScope.launch {
@@ -233,6 +237,104 @@ class CourseViewModel(
             Log.d("CourseVM", "Reloaded role: ${_userRole.value}")
         }
     }
+
+
+
+    private val _searchResults = MutableStateFlow<List<SearchItem>>(emptyList())
+    val searchResults: StateFlow<List<SearchItem>> = _searchResults
+
+    private val _fullSearchResults = MutableStateFlow<List<FullSearchItem>>(emptyList())
+    val fullSearchResults: StateFlow<List<FullSearchItem>> = _fullSearchResults
+
+    private val _notes = mutableStateMapOf<String, String>()
+    val notes: Map<String, String> = _notes
+
+    private val _progress = mutableStateMapOf<String, Boolean>()
+    val progress: Map<String, Boolean> = _progress
+
+    // Real-time dropdown search
+    fun searchCourses(query: String) {
+        viewModelScope.launch {
+            if (query.isBlank()) {
+                _searchResults.value = emptyList()
+                return@launch
+            }
+            val response = repository.searchCourses(query)
+            if (response.isSuccessful) {
+                _searchResults.value = response.body()?.courses ?: emptyList()
+            } else {
+                _searchResults.value = emptyList()
+            }
+        }
+    }
+
+    // Full search with filters
+    fun searchCoursesFull(query: String, difficulty: String?, sortBy: String?) {
+        viewModelScope.launch {
+            if (query.isBlank()) {
+                _fullSearchResults.value = emptyList()
+                return@launch
+            }
+            val response = repository.searchCoursesFull(query, difficulty, sortBy)
+            if (response.isSuccessful) {
+                _fullSearchResults.value = response.body()?.courses ?: emptyList()
+            } else {
+                _fullSearchResults.value = emptyList()
+            }
+        }
+    }
+
+    // Delete own course
+    fun deleteMyCourse(courseId: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val response = repository.deleteMyCourse(courseId)
+            if (response.isSuccessful) {
+                onSuccess()
+                getMyCourses() // refresh list
+            }
+        }
+    }
+
+    // Save note
+    fun saveNote(subtopicId: String, note: String) {
+        viewModelScope.launch {
+            val response = repository.saveNote(subtopicId, note)
+            if (response.isSuccessful) {
+                _notes[subtopicId] = note
+            }
+        }
+    }
+
+    // Load note
+    fun loadNote(subtopicId: String) {
+        viewModelScope.launch {
+            val response = repository.getNote(subtopicId)
+            if (response.isSuccessful) {
+                response.body()?.note?.let { _notes[subtopicId] = it }
+            }
+        }
+    }
+
+    // Toggle complete
+    fun toggleComplete(subtopicId: String, completed: Boolean) {
+        viewModelScope.launch {
+            val response = repository.markComplete(subtopicId, completed)
+            if (response.isSuccessful) {
+                _progress[subtopicId] = completed
+            }
+        }
+    }
+
+    // Load course progress
+    fun loadCourseProgress(courseId: String) {
+        viewModelScope.launch {
+            val response = repository.getCourseProgress(courseId)
+            if (response.isSuccessful) {
+                response.body()?.forEach { _progress[it.subtopic_id] = it.completed }
+            }
+        }
+    }
+
 
 
     data class GenerationProgress(
@@ -459,240 +561,10 @@ class CourseViewModel(
                     stopStreaming()
                 }
             }
-//            try {
-//                client.newCall(request).enqueue(object : Callback {
-//                    override fun onFailure(call: Call, e: IOException) {
-//                        Log.e("STREAMING", "❌ SSE Failed: ${e.message}", e)
-//                        viewModelScope.launch(Dispatchers.Main) {
-//                            _streamingEvents.tryEmit(SSEEvent(type = "error", message = e.message))
-//                            stopStreaming()
-//                        }
-//                    }
-//
-//                    override fun onResponse(call: Call, response: Response) {
-//                        if (!response.isSuccessful) {
-//                            Log.e("STREAMING", "❌ SSE Failed: HTTP ${response.code}")
-//                            viewModelScope.launch(Dispatchers.Main) {
-//                                _streamingEvents.tryEmit(SSEEvent(type = "error", message = "HTTP ${response.code}"))
-//                                stopStreaming()
-//                            }
-//                            return
-//                        }
-//
-//                        Log.d("STREAMING", "✅ SSE Connected, streaming data...")
-//                        val source = response.body?.source() ?: return
-//
-//                        try {
-//                            val buffer = okio.Buffer()
-//
-//                            while (!source.exhausted()) {
-//                                val bytesRead = source.read(buffer, 8192)
-//                                if (bytesRead == -1L) break
-//
-//                                val chunk = buffer.readUtf8()
-//                                val lines = chunk.split("\n")
-//
-//                                for (line in lines) {
-//                                    if (line.startsWith("data:")) {
-//                                        val json = line.removePrefix("data:").trim()
-//                                        if (json == "[DONE]") continue
-//
-//                                        try {
-//                                            val event = Gson().fromJson(json, SSEEvent::class.java)
-//                                            Log.d("SSE_PARSED", "📨 Type: ${event.type}, Chunk: '${event.chunk?.take(50)}...'")
-//
-//                                            // Keep your existing event handling logic here
-//                                            when (event.type) {
-//                                                "chunk" -> {
-//                                                    val chunkText = event.chunk.orEmpty()
-//                                                    val subtopic = event.subtopic.orEmpty()
-//
-//                                                    if (chunkText.isNotBlank()) {
-//                                                        viewModelScope.launch(Dispatchers.Main) {
-//                                                            _currentStreamingText.update { current ->
-//                                                                Log.d("STREAMING_UI", "📝 Adding chunk: ${chunkText.take(30)}...")
-//                                                                current + chunkText
-//                                                            }
-//                                                            if (subtopic.isNotBlank() && subtopic != _currentStreamingSubtopic.value) {
-//                                                                _currentStreamingSubtopic.value = subtopic
-//                                                            }
-//                                                            _streamingEvents.tryEmit(event)
-//                                                        }
-//                                                    }
-//                                                }
-//                                                "progress" -> {
-//                                                    viewModelScope.launch(Dispatchers.Main) {
-//                                                        updateProgress(event)
-//                                                        if (event.subtopic != _currentStreamingSubtopic.value) {
-//                                                            _currentStreamingText.value = ""
-//                                                            _currentStreamingSubtopic.value = event.subtopic
-//                                                        }
-//                                                        _streamingEvents.tryEmit(event)
-//                                                    }
-//                                                }
-//                                                "start" -> {
-//                                                    viewModelScope.launch(Dispatchers.Main) {
-//                                                        _streamingEvents.tryEmit(event)
-//                                                    }
-//                                                }
-//                                                "complete" -> {
-//                                                    viewModelScope.launch(Dispatchers.Main) {
-//                                                        Log.d("STREAMING", "🎉 Streaming complete - starting polling")
-//                                                        _isGeneratingContent.value = false
-//                                                        _generationProgress.value = null
-//                                                        _streamingEvents.tryEmit(event)
-//                                                        startPollingFullContent(courseId)
-//                                                    }
-//                                                }
-//                                                "error" -> {
-//                                                    viewModelScope.launch(Dispatchers.Main) {
-//                                                        Log.e("STREAMING", "❌ Stream error: ${event.message}")
-//                                                        stopStreaming()
-//                                                    }
-//                                                }
-//                                            }
-//
-//                                        } catch (e: Exception) {
-//                                            Log.e("SSE", "❌ Parse error: $json", e)
-//                                        }
-//                                    }
-//                                }
-//                            }
-//                        } catch (e: Exception) {
-//                            Log.e("STREAMING", "Stream read error", e)
-//                        } finally {
-//                            response.close()
-//                        }
-//                    }
-//                })
-//            } catch (e: Exception) {
-//                Log.e("STREAMING", "❌ SSE Failed: ${e.message}", e)
-//                withContext(Dispatchers.Main) {
-//                    _streamingEvents.tryEmit(SSEEvent(type = "error", message = e.message))
-//                    stopStreaming()
-//                }
-//            }
 
         }
     }
-//    fun startStreamingGeneration(courseId: String, provider: String? = null, model: String? = null) {
-//        Log.d("STREAMING", "🚀 STARTING STREAMING for courseId: $courseId")
 //
-//        viewModelScope.launch(Dispatchers.IO) {
-//            withContext(Dispatchers.Main) {
-//                _currentStreamingText.value = ""
-//                _currentStreamingSubtopic.value = null
-//                _isGeneratingContent.value = true
-//                _generationProgress.value = null
-//                _generationStartTime.value = System.currentTimeMillis()
-//                _isPollingActive.value = false
-//            }
-//
-//            val client = RetrofitClient.getOkHttpClientForSSE(context)
-//
-//            val requestBody = buildString {
-//                append("{\n")
-//                append("  \"provider\": \"${provider ?: "Groq"}\"")
-//                if (model != null) {
-//                    append(",\n  \"model\": \"$model\"")
-//                }
-//                append("\n}")
-//            }.toRequestBody("application/json".toMediaType())
-//
-//            val request = Request.Builder()
-//                .url("${RetrofitClient.BASE_URL}api/courses/$courseId/generate-content-stream")
-//                .post(requestBody)
-//                .build()
-//
-//            Log.d("STREAMING", "📡 SSE URL: ${request.url}")
-//
-//            try {
-//                client.newCall(request).execute().use { response ->
-//                    if (!response.isSuccessful) {
-//                        Log.e("STREAMING", "❌ SSE Failed: HTTP ${response.code}")
-//                        withContext(Dispatchers.Main) {
-//                            _streamingEvents.tryEmit(SSEEvent(type = "error", message = "HTTP ${response.code}"))
-//                            stopStreaming()
-//                        }
-//                        return@launch
-//                    }
-//
-//                    Log.d("STREAMING", "✅ SSE Connected, starting to read stream...")
-//
-//                    val source = response.body?.source()
-//                    val buffer = Buffer()
-//
-//                    while (true) {
-//                        // Read chunks in real-time instead of waiting for complete lines
-//                        val bytesRead = source?.read(buffer, 8192) ?: -1
-//                        if (bytesRead == -1L) break
-//
-//                        val chunk = buffer.readUtf8()
-//                        buffer.clear()
-//
-//                        // Process each line in the chunk immediately
-//                        chunk.lines().forEach { line ->
-//                            if (line.startsWith("data:")) {
-//                                val json = line.removePrefix("data:").trim()
-//                                if (json == "[DONE]" || json.isEmpty()) return@forEach
-//
-//                                try {
-//                                    val event = Gson().fromJson(json, SSEEvent::class.java)
-//                                    Log.d("SSE_PARSED", "📨 Type: ${event.type}")
-//
-//                                    when (event.type) {
-//                                        "chunk" -> {
-//                                            val chunkData = event.chunk.orEmpty()
-//                                            val subtopic = event.subtopic.orEmpty()
-//
-//                                            if (chunkData.isNotBlank()) {
-//                                                viewModelScope.launch(Dispatchers.Main) {
-//                                                    _currentStreamingText.update { current ->
-//                                                        current + chunkData
-//                                                    }
-//                                                    if (subtopic.isNotBlank() && subtopic != _currentStreamingSubtopic.value) {
-//                                                        _currentStreamingSubtopic.value = subtopic
-//                                                    }
-//                                                    _streamingEvents.tryEmit(event)
-//                                                }
-//                                            }
-//                                        }
-//                                        // Handle other event types...
-//                                        "progress" -> {
-//                                            viewModelScope.launch(Dispatchers.Main) {
-//                                                updateProgress(event)
-//                                                _streamingEvents.tryEmit(event)
-//                                            }
-//                                        }
-//                                        "complete" -> {
-//                                            viewModelScope.launch(Dispatchers.Main) {
-//                                                _isGeneratingContent.value = false
-//                                                startPollingFullContent(courseId)
-//                                            }
-//                                        }
-//                                        "error" -> {
-//                                            viewModelScope.launch(Dispatchers.Main) {
-//                                                stopStreaming()
-//                                            }
-//                                        }
-//                                    }
-//                                } catch (e: Exception) {
-//                                    Log.e("SSE", "❌ Parse error: $line", e)
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            } catch (e: Exception) {
-//                Log.e("STREAMING", "❌ SSE Failed: ${e.message}", e)
-//                withContext(Dispatchers.Main) {
-//                    _streamingEvents.tryEmit(SSEEvent(type = "error", message = e.message))
-//                    stopStreaming()
-//                }
-//            }
-//        }
-//    }
-
     fun updateProgress(event: SSEEvent) {
         if (event.type == "progress") {
             _generationProgress.value = GenerationProgress(
@@ -913,64 +785,7 @@ class CourseViewModel(
 
 
 
-//    // Update the generateCourseContent method
-//    fun generateCourseContent(courseId: String, provider: String? = null, model: String? = null) {
-//        viewModelScope.launch {
-//            _isGeneratingContent.value = true
-//            _generationStartTime.value = System.currentTimeMillis()
-//            _content.value = Resource.Loading()
-//            try {
-//                val response = repository.generateContent(courseId, provider, model)
-//                if (response.isSuccessful) {
-//                    _content.value = Resource.Success(response.body()!!)
-//                    // Start polling only AFTER content generation starts
-//                    startPollingGenerationStatus(courseId)
-//                } else {
-//                    _content.value = Resource.Error("Failed to generate content: ${response.code()}")
-//                    _isGeneratingContent.value = false
-//                }
-//            } catch (e: Exception) {
-//                _content.value = Resource.Error(e.localizedMessage ?: "Unknown error")
-//                _isGeneratingContent.value = false
-//            }
-//        }
-//    }
-
-    // Auto-polling function
-//    private var pollingJob: Job? = null
 //
-//    fun stopPolling() {
-//        pollingJob?.cancel()
-//        pollingJob = null
-//    }
-//
-//    // Update polling to handle initial delays
-//    fun startPollingGenerationStatus(courseId: String, interval: Long = 3000L) {
-//        pollingJob?.cancel()
-//        pollingJob = viewModelScope.launch {
-//            // Wait a bit before first poll to allow generation to start
-//            delay(2000)
-//            while (true) {
-//                getGenerationStatus(courseId)
-//                delay(interval)
-//            }
-//        }
-//    }
-//
-//    fun getGenerationStatus(courseId: String, since: String? = null) {
-//        viewModelScope.launch {
-//            _generationStatus.value = Resource.Loading()
-//            try {
-//                val response = repository.getCourseGenerationStatus(courseId, since)
-//                if (response.isSuccessful) {
-//                    _generationStatus.value = Resource.Success(response.body()!!)
-//                } else {
-//                    _generationStatus.value = Resource.Error("Failed to get generation status: ${response.code()}")
-//                }
-//            } catch (e: Exception) {
-//                _generationStatus.value = Resource.Error(e.localizedMessage ?: "Unknown error")
-//            }
-//        }
 
 
     fun getFullCourseContent(courseId: String) {
@@ -996,30 +811,6 @@ class CourseViewModel(
 //    }
 
 
-//    fun getFullCourseContent(courseId: String) {
-//        viewModelScope.launch {
-//            // Preserve previous data during loading
-//            val current = _fullCourseContent.value
-//            val previousData = if (current is Resource.Success) current.data else null
-//
-//            _fullCourseContent.value = Resource.Loading(previousData)  // ← FIXED
-//
-//            try {
-//                val response = repository.getFullCourse(courseId)
-//                if (response.isSuccessful && response.body() != null) {
-//                    _fullCourseContent.value = Resource.Success(data?.copy())
-//                } else {
-//                    val errorMsg = "HTTP ${response.code()}: ${response.message()}"
-//                    _fullCourseContent.value = Resource.Error(errorMsg, previousData)
-//                }
-//            } catch (e: Exception) {
-//                _fullCourseContent.value = Resource.Error(
-//                    message = e.localizedMessage ?: "Network error",
-//                    data = previousData
-//                )
-//            }
-//        }
-//    }
 
     fun getAllPublicCourses() {
         viewModelScope.launch {
@@ -1084,6 +875,7 @@ class CourseViewModel(
             }
         }
     }
+
 
 
 

@@ -78,4 +78,13 @@ class CourseRepository(private val api: ApiService) {
         return api.getDefaultProviders()
     }
 
+    suspend fun searchCourses(query: String) = api.searchCourses(query)
+    suspend fun searchCoursesFull(q: String, d: String?, s: String?) = api.searchFull(q, d, s)
+    suspend fun deleteMyCourse(id: String) = api.deleteCourse(id)
+    suspend fun saveNote(id: String, note: String) = api.saveNote(id, mapOf("note" to note))
+    suspend fun getNote(id: String) = api.getNote(id)
+    suspend fun markComplete(id: String, completed: Boolean) = api.markComplete(id, mapOf("completed" to completed))
+    suspend fun getCourseProgress(courseId: String) = api.getProgress(courseId)
+
+
 }
