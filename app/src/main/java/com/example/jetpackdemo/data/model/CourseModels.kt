@@ -41,6 +41,10 @@ data class CoursesResponse(
     val courses: List<Course>
 )
 
+data class MyCoursesResponse(
+    @SerializedName("myCourses")
+    val courses: List<Course>
+)
 data class Course(
     val id: String,
     val title: String,

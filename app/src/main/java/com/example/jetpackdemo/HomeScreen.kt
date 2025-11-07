@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -78,14 +79,38 @@ fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: 
     NavHost(navController = bottomBarNavController, startDestination = "home") {
         composable("home") {
             HomeScreen(
-                onCreateCourseClicked = { appNavController.navigate("create_course") }
+                onCreateCourseClicked = { appNavController.navigate("create_course") },
+                courseViewModel = courseViewModel
             )
         }
-        composable("progress") {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Progress Screen")
-            }
+        composable("my_courses") {
+            MyCoursesScreen(
+                viewModel = courseViewModel,
+                onCourseClick = { courseId ->
+//                    appNavController.navigate("course_content/$courseId")
+                    bottomBarNavController.navigate("course_content/$courseId")  // ← CORRECT
+                }
+            )
         }
+
+        composable("course_content/{courseId}") { backStackEntry ->
+
+            val courseId = backStackEntry.arguments?.getString("courseId")
+                ?: return@composable  // ← REPLACE !!
+            if (courseId.isBlank()) return@composable
+
+            // Set courseId safely
+            LaunchedEffect(courseId) {
+                courseViewModel.setCourseId(courseId)
+            }
+
+            CourseContentScreen(
+                courseViewModel = courseViewModel,
+                onNavigateBack = { bottomBarNavController.popBackStack() }
+            )
+        }
+
+
         composable("profile") {
             // === PASS ADMIN VIEWMODEL ONLY IF ADMIN ===
             UserProfileScreen(
@@ -101,10 +126,10 @@ fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: 
 // --- Simplified HomeScreen (Content Only) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onCreateCourseClicked: () -> Unit) {
+fun HomeScreen(onCreateCourseClicked: () -> Unit, courseViewModel: CourseViewModel) {
     Scaffold(
         containerColor = AppColors.background,
-        topBar = { HomeTopBar() },
+        topBar = { HomeTopBar(courseViewModel) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateCourseClicked,
@@ -149,7 +174,7 @@ fun HomeScreen(onCreateCourseClicked: () -> Unit) {
 fun HomeBottomNavigation(navController: NavHostController) {
     val items = listOf(
         BottomNavItem("Home", "home", Icons.Default.Home),
-        BottomNavItem("Progress", "progress", Icons.AutoMirrored.Filled.ShowChart), // Use the AutoMirrored version
+        BottomNavItem("My Courses", "my_courses", Icons.AutoMirrored.Filled.ShowChart),
         BottomNavItem("Profile", "profile", Icons.Default.Person)
     )
 
@@ -190,14 +215,15 @@ fun HomeBottomNavigation(navController: NavHostController) {
 // --- Other Composables for HomeScreen ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeTopBar() {
+fun HomeTopBar(courseViewModel: CourseViewModel) {
+    val username by courseViewModel.username.collectAsState()
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("👋", fontSize = 24.sp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Welcome back, Krish!",
+                    "Welcome back, $username",
                     color = AppColors.textPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp

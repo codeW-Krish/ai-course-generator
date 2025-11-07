@@ -29,6 +29,8 @@ fun ProviderDropdown(
     providers: List<String>,
     onProviderSelected: (String) -> Unit
 ) {
+
+
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
@@ -72,6 +74,8 @@ fun CreateCourseScreen(
     onNavigateBack: () -> Unit,
     onGenerateOutline: () -> Unit
 ) {
+
+
     // ────── UI STATE ──────
     var courseTitle by remember { mutableStateOf("") }
     var courseDescription by remember { mutableStateOf("") }

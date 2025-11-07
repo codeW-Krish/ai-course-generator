@@ -25,6 +25,18 @@ class UserPreferencesManager(context: Context) {
         return sharedPreferences.getString("refresh_token", null)
     }
 
+    fun saveUserData(userId: String, username: String, role: String, email: String) {
+        sharedPreferences.edit()
+            .putString("user_id", userId)
+            .putString("username", username)
+            .putString("user_role", role)
+            .putString("user_email", email)
+            .apply()
+    }
+
+    fun getUsername(): String? = sharedPreferences.getString("username", null)
+    fun getEmail(): String? = sharedPreferences.getString("user_email", null)
+
     // Add role management
     fun saveUserRole(role: String) {
         sharedPreferences.edit().putString("user_role", role).apply()

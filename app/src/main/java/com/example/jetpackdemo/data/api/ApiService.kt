@@ -15,6 +15,7 @@ import com.example.jetpackdemo.data.model.GeneratedSubtopicContent
 import com.example.jetpackdemo.data.model.GenerationStatusResponse
 import com.example.jetpackdemo.data.model.GlobalSettingsResponse
 import com.example.jetpackdemo.data.model.LoginRequest
+import com.example.jetpackdemo.data.model.MyCoursesResponse
 import com.example.jetpackdemo.data.model.NoteResponse
 import com.example.jetpackdemo.data.model.ProgressItem
 import com.example.jetpackdemo.data.model.RefreshRequest
@@ -77,7 +78,7 @@ interface ApiService {
 
     // GET courses created by current user
     @GET("/api/courses/me")
-    suspend fun getMyCourses(): Response<CoursesResponse>
+    suspend fun getMyCourses(): Response<MyCoursesResponse>
 
     // GET courses enrolled by current user
     @GET("/api/courses/me/enrolled")

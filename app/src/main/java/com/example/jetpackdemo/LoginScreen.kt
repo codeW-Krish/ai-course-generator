@@ -140,13 +140,13 @@ fun LoginScreen(navController: NavHostController, courseViewModel: CourseViewMod
                                 // === SAVE USER ROLE (Critical for RBAC) ===
                                 body.user.role?.let { role ->
                                     userPrefsManager.saveUserRole(role)
-                                    Log.d("LOGIN", "User role saved: $role")
-                                } ?: run {
-                                    // Fallback: default to 'user' if role missing
-                                    userPrefsManager.saveUserRole("user")
-                                }
+                                } ?: userPrefsManager.saveUserRole("user")
 
-                                courseViewModel.reloadUserRole();
+                                val role = userPrefsManager.getUserRole()
+                                userPrefsManager.saveUserData(body.user.id, body.user.username, role, email)
+                                courseViewModel.reloadUserRole()
+                                courseViewModel.reloadUserData()
+
                                 // === NAVIGATE TO MAIN ===
                                 navController.navigate("main") {
                                     popUpTo("welcome") { inclusive = true }

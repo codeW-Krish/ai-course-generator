@@ -16,10 +16,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jetpackdemo.data.model.Course
-import com.example.jetpackdemo.data.model.CoursesResponse
 import com.example.jetpackdemo.ui.theme.AppColors
 import com.example.jetpackdemo.viewmodels.CourseViewModel
 import com.example.jetpackdemo.viewmodels.Resource
+import com.example.jetpackdemo.data.model.MyCoursesResponse
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,7 +30,6 @@ fun MyCoursesScreen(
 ) {
     // Use observeAsState for LiveData, not collectAsState
     val myCoursesState by viewModel.myCourses.observeAsState(Resource.Loading())
-
     LaunchedEffect(Unit) {
         viewModel.getMyCourses()
     }
@@ -119,24 +119,30 @@ fun MyGeneratedCourseCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                course.title,
+                text = course.title,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = AppColors.textPrimary
             )
             Spacer(Modifier.height(4.dp))
 
-            // Use snake_case field names as they come from your API
             Text(
-                "Units: ${course.title ?: ""}",
+                text = "Course ID: ${course.id}",
                 fontSize = 14.sp,
                 color = AppColors.textSecondary
             )
             Spacer(Modifier.height(4.dp))
 
-            val date = course.description ?: "N/A"
+
             Text(
-                "Created: $date",
+                text = "Description: ${course.description ?: "No description"}",
+                fontSize = 14.sp,
+                color = AppColors.textSecondary
+            )
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = "Created: ${course.createdAt ?: "N/A"}",
                 fontSize = 14.sp,
                 color = AppColors.textSecondary
             )

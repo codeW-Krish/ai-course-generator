@@ -17,6 +17,7 @@ import androidx.navigation.NavHostController
 import com.example.jetpackdemo.data.model.DefaultProvidersResponse
 import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.example.jetpackdemo.ui.theme.AppColors
+import com.example.jetpackdemo.utils.TokenManager
 import com.example.jetpackdemo.viewmodels.CourseViewModel
 import com.example.jetpackdemo.viewmodels.AdminViewModel
 
@@ -30,6 +31,7 @@ fun UserProfileScreen(
 ) {
     val context = LocalContext.current
     val userPrefsManager = remember { UserPreferencesManager(context) }
+    val tokenManager = remember { TokenManager(context) }
 
     // === ViewModel State ===
     val userRole by courseViewModel.userRole.collectAsState()
@@ -104,9 +106,18 @@ fun UserProfileScreen(
                     onClick = {
                         userPrefsManager.clearAll()
                         courseViewModel.clearUserData()
-                        navController.navigate("welcome") {
+                        tokenManager.clearTokens()
+                        navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
+//                        navController.navigate("login") {
+//                            popUpTo("main") { inclusive = false }
+//                            launchSingleTop = true
+//                        }
+//                        navController.navigate("login") {
+//                            popUpTo(navController.graph.startDestinationId) { inclusive = false }
+//                            launchSingleTop = true
+//                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
@@ -288,6 +299,11 @@ fun ProviderSelectionSection(
 // === PROFILE HEADER ===
 @Composable
 fun ProfileHeader() {
+    val context = LocalContext.current
+    val userPrefsManager = remember { UserPreferencesManager(context) }
+    // Read saved username and email directly from SharedPreferences
+    val username = remember { userPrefsManager.getUsername() ?: "User" }
+    val email = remember { userPrefsManager.getEmail() ?: "user@example.com" }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
@@ -295,8 +311,8 @@ fun ProfileHeader() {
                 .background(Color.Gray, shape = RoundedCornerShape(50))
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Text("User Name", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
-        Text("user@example.com", fontSize = 14.sp, color = AppColors.textSecondary)
+        Text(username, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
+        Text(email, fontSize = 14.sp, color = AppColors.textSecondary)
     }
 }
 
@@ -356,12 +372,15 @@ fun DropdownMenuProvider(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
+    // ADD THIS LINE – FORCE VALID SELECTION
+    val displayProvider = if (selectedProvider in providers) selectedProvider else providers.firstOrNull() ?: "None"
+
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = selectedProvider,
+            value = displayProvider,  // Use safe value
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -467,6 +486,14 @@ fun ProviderManagementDialog(
         },
         confirmButton = {
             Button(onClick = {
+                // Validate defaults are in available
+                if (selectedOutline !in currentProviders) {
+                    // Fallback to first available
+                    selectedOutline = currentProviders.firstOrNull() ?: "Groq"
+                }
+                if (selectedContent !in currentProviders) {
+                    selectedContent = currentProviders.firstOrNull() ?: "Groq"
+                }
                 onUpdateAvailableProviders(currentProviders)
                 onUpdateDefaultProviders(selectedOutline, selectedContent)
                 onDismiss()

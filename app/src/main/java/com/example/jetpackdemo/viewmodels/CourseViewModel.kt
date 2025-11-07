@@ -56,8 +56,8 @@ class CourseViewModel(
     private val _publicCourses = MutableLiveData<Resource<CoursesResponse>>()
     val publicCourses: LiveData<Resource<CoursesResponse>> = _publicCourses
 
-    private val _myCourses = MutableLiveData<Resource<CoursesResponse>>()
-    val myCourses: LiveData<Resource<CoursesResponse>> = _myCourses
+    private val _myCourses = MutableLiveData<Resource<MyCoursesResponse>>()
+    val myCourses: LiveData<Resource<MyCoursesResponse>> = _myCourses
 
     private val _enrolledCourses = MutableLiveData<Resource<CoursesResponse>>()
     val enrolledCourses: LiveData<Resource<CoursesResponse>> = _enrolledCourses
@@ -87,6 +87,11 @@ class CourseViewModel(
     private val _courseId = MutableStateFlow<String?>(null)
     val courseId = _courseId.asStateFlow()
 
+
+    // In CourseViewModel.kt
+    fun setCourseId(id: String) {
+        _courseId.value = id
+    }
 
     // Add these state flows to your CourseViewModel
     private val _isGeneratingContent = MutableStateFlow(false)
@@ -146,6 +151,8 @@ class CourseViewModel(
     val userRole = _userRole.asStateFlow()
 
 
+    private val _username = MutableStateFlow("User")  // Default
+    val username = _username.asStateFlow()
 
 
     // Update the init block
@@ -182,7 +189,8 @@ class CourseViewModel(
                 val response = repository.getAvailableProviders()
                 if (response.isSuccessful) {
                     _availableProviders.value = response.body()?.providers ?: emptyList()
-                }
+                    validateAndFixUserProviders()  // ADD THIS LINE
+            }
             } catch (e: Exception) {
                 Log.e("VIEWMODEL", "Failed to load available providers", e)
             }
@@ -236,6 +244,18 @@ class CourseViewModel(
             _userRole.value = userPrefsManager.getUserRole()
             Log.d("CourseVM", "Reloaded role: ${_userRole.value}")
         }
+    }
+
+    fun reloadUserData(){
+        viewModelScope.launch {
+            _username.value = userPrefsManager.getUsername() ?: "User"
+        }
+    }
+
+    fun refreshProviders() {
+        // This function should be called every time the screen is shown
+        loadAvailableProviders()
+        loadDefaultProviders()
     }
 
 
