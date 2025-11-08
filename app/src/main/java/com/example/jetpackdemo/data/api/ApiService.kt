@@ -24,6 +24,7 @@ import com.example.jetpackdemo.data.model.RegisterRequest
 import com.example.jetpackdemo.data.model.SearchResponse
 import com.example.jetpackdemo.data.model.UpdateDefaultProvidersRequest
 import com.example.jetpackdemo.data.model.UpdateProvidersRequest
+import com.example.jetpackdemo.data.model.enrolledCoursesResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -82,7 +83,7 @@ interface ApiService {
 
     // GET courses enrolled by current user
     @GET("/api/courses/me/enrolled")
-    suspend fun getEnrolledCourses(): Response<CoursesResponse>
+    suspend fun getEnrolledCourses(): Response<enrolledCoursesResponse>
 
     // Enroll in course by ID
     @POST("/api/courses/{id}/enroll")

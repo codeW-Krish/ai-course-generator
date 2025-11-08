@@ -28,7 +28,7 @@ class CourseRepository(private val api: ApiService) {
         return api.getMyCourses()
     }
 
-    suspend fun getEnrolledCourses(): Response<CoursesResponse> {
+    suspend fun getEnrolledCourses(): Response<enrolledCoursesResponse> {
         return api.getEnrolledCourses()
     }
 

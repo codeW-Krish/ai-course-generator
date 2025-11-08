@@ -1,9 +1,12 @@
 package com.example.jetpackdemo
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,15 +14,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -31,28 +33,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.jetpackdemo.data.model.Course
+import com.example.jetpackdemo.data.model.CoursesResponse
 import com.example.jetpackdemo.ui.theme.AppColors
 import com.example.jetpackdemo.viewmodels.AdminViewModel
 import com.example.jetpackdemo.viewmodels.CourseViewModel
+import com.example.jetpackdemo.viewmodels.Resource
 
 // --- Data Models ---
-data class Course(
-    val title: String,
-    val lessonCount: Int,
-    val progress: Float
-)
-
-data class DiscoverCourse(
-    val title: String,
-    val instructor: String,
-    val studentCount: String,
-    val tag: String,
-    val level: String,
-    val instructorImage: Int
-)
-
 data class BottomNavItem(val title: String, val route: String, val icon: ImageVector)
-
 
 // --- Main Screen with Bottom Navigation ---
 @Composable
@@ -74,32 +63,53 @@ fun MainScreen(navController: NavHostController, courseViewModel: CourseViewMode
 
 // --- Navigation Graph for the Bottom Bar Tabs ---
 @Composable
-fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: NavHostController, courseViewModel: CourseViewModel, adminViewModel: AdminViewModel? = null) {
-    val userRole by courseViewModel.userRole.collectAsState()
+fun BottomNavGraph(
+    bottomBarNavController: NavHostController,
+    appNavController: NavHostController,
+    courseViewModel: CourseViewModel,
+    adminViewModel: AdminViewModel? = null
+) {
     NavHost(navController = bottomBarNavController, startDestination = "home") {
         composable("home") {
             HomeScreen(
                 onCreateCourseClicked = { appNavController.navigate("create_course") },
-                courseViewModel = courseViewModel
+                courseViewModel = courseViewModel,
+                onSeeAllPublic = { bottomBarNavController.navigate("public_courses") }
             )
         }
         composable("my_courses") {
             MyCoursesScreen(
                 viewModel = courseViewModel,
                 onCourseClick = { courseId ->
-//                    appNavController.navigate("course_content/$courseId")
-                    bottomBarNavController.navigate("course_content/$courseId")  // ← CORRECT
+                    bottomBarNavController.navigate("course_content/$courseId")
                 }
             )
         }
 
-        composable("course_content/{courseId}") { backStackEntry ->
+        // Inside BottomNavGraph
+        composable("enrolled_courses") {
+            EnrolledCoursesScreen(
+                viewModel = courseViewModel,
+                onCourseClick = { courseId ->
+                    bottomBarNavController.navigate("course_content/$courseId")
+                }
+            )
+        }
 
-            val courseId = backStackEntry.arguments?.getString("courseId")
-                ?: return@composable  // ← REPLACE !!
+        composable("public_courses") {
+            PublicCoursesScreen(
+                viewModel = courseViewModel,
+                onJoinCourse = { courseId ->
+                    courseViewModel.enrollInCourse(courseId)
+                },
+                onNavigateBack = { bottomBarNavController.popBackStack() }
+            )
+        }
+
+        composable("course_content/{courseId}") { backStackEntry ->
+            val courseId = backStackEntry.arguments?.getString("courseId") ?: return@composable
             if (courseId.isBlank()) return@composable
 
-            // Set courseId safely
             LaunchedEffect(courseId) {
                 courseViewModel.setCourseId(courseId)
             }
@@ -109,24 +119,47 @@ fun BottomNavGraph(bottomBarNavController: NavHostController, appNavController: 
                 onNavigateBack = { bottomBarNavController.popBackStack() }
             )
         }
-
-
         composable("profile") {
-            // === PASS ADMIN VIEWMODEL ONLY IF ADMIN ===
             UserProfileScreen(
                 navController = appNavController,
                 courseViewModel = courseViewModel,
                 adminViewModel = adminViewModel
             )
         }
+
+
     }
 }
 
-
-// --- Simplified HomeScreen (Content Only) ---
+// --- HomeScreen ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onCreateCourseClicked: () -> Unit, courseViewModel: CourseViewModel) {
+fun HomeScreen(
+    onCreateCourseClicked: () -> Unit,
+    courseViewModel: CourseViewModel,
+    onSeeAllPublic: () -> Unit
+) {
+
+    val context = LocalContext.current
+    val enrollResult by courseViewModel.enrollResult.observeAsState(Resource.Loading())
+    LaunchedEffect(enrollResult) {
+        when (enrollResult) {
+            is Resource.Success -> {
+                Toast.makeText(context, "Successfully enrolled!", Toast.LENGTH_SHORT).show()
+                courseViewModel.clearEnrollResult()
+            }
+            is Resource.Error -> {
+                Toast.makeText(context, enrollResult.message ?: "Failed to enroll", Toast.LENGTH_SHORT).show()
+                courseViewModel.clearEnrollResult()
+            }
+            else -> Unit
+        }
+    }
+
+
+
+    LaunchedEffect(Unit) { courseViewModel.getAllPublicCourses() }
+
     Scaffold(
         containerColor = AppColors.background,
         topBar = { HomeTopBar(courseViewModel) },
@@ -134,47 +167,141 @@ fun HomeScreen(onCreateCourseClicked: () -> Unit, courseViewModel: CourseViewMod
             FloatingActionButton(
                 onClick = onCreateCourseClicked,
                 containerColor = AppColors.primary,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
-
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-
                     verticalAlignment = Alignment.CenterVertically
-
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Create Course", tint = AppColors.onPrimary)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text("Create Course", color = AppColors.onPrimary)
                 }
             }
         },
-        floatingActionButtonPosition = FabPosition.End // Centered FAB
+        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item { Spacer(Modifier.height(8.dp)) }
+
             item {
-                YourCoursesSection()
-                Spacer(modifier = Modifier.height(24.dp))
-                DiscoverCoursesSection()
-                Spacer(modifier = Modifier.height(80.dp)) // Space for the FAB
+                DiscoverCoursesSection(
+                    courseViewModel = courseViewModel,
+                    onSeeAllClicked = onSeeAllPublic
+                )
+            }
+
+            item { Spacer(Modifier.height(80.dp)) }
+        }
+    }
+}
+
+@Composable
+fun DiscoverCoursesSection(
+    courseViewModel: CourseViewModel,
+    onSeeAllClicked: () -> Unit
+) {
+    val publicCoursesState by courseViewModel.publicCourses.observeAsState(Resource.Loading<CoursesResponse>())
+
+    Column {
+        SectionHeader(title = "Discover Courses", onSeeAll = onSeeAllClicked)
+
+        when (publicCoursesState) {
+            is Resource.Loading -> {
+                Box(modifier = Modifier.height(150.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AppColors.primary)
+                }
+            }
+            is Resource.Success -> {
+                val courses = publicCoursesState.data?.courses?.take(5) ?: emptyList()
+                if (courses.isEmpty()) {
+                    Text("No courses available", color = AppColors.textSecondary)
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        items(courses) { course ->
+                            DiscoverCourseCard(
+                                course = course,
+                                onJoin = { courseViewModel.enrollInCourse(course.id) }  // ← CALL API
+                            )
+                        }
+                    }
+                }
+            }
+            is Resource.Error -> {
+                Text("Error loading courses", color = Color.Red)
             }
         }
     }
 }
 
+@Composable
+fun DiscoverCourseCard(
+    course: Course,
+    onJoin: () -> Unit  // ← NEW
+) {
+    Card(
+        modifier = Modifier.width(280.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(course.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.textPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text("ID: ${course.id}", fontSize = 14.sp, color = AppColors.textSecondary)
+            Spacer(Modifier.height(4.dp))
+            course.description?.let {
+                Text(it, fontSize = 14.sp, color = AppColors.textSecondary, maxLines = 2)
+                Spacer(Modifier.height(4.dp))
+            }
+            course.difficulty?.let {
+                Text("Level: $it", fontSize = 14.sp, color = AppColors.textSecondary)
+            }
+            Spacer(Modifier.height(12.dp))
 
-// --- Updated Bottom Navigation Bar ---
-// --- Updated Bottom Navigation Bar ---
+            // CONNECT TO onJoin
+            OutlinedButton(
+                onClick = onJoin,  // ← NOW CALLS enroll
+                modifier = Modifier.align(Alignment.End),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Join")
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String, onSeeAll: () -> Unit = {}) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = AppColors.textPrimary)
+        TextButton(onClick = onSeeAll) {
+            Text("See all", color = AppColors.accent, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// --- Bottom Navigation ---
 @Composable
 fun HomeBottomNavigation(navController: NavHostController) {
     val items = listOf(
         BottomNavItem("Home", "home", Icons.Default.Home),
         BottomNavItem("My Courses", "my_courses", Icons.AutoMirrored.Filled.ShowChart),
+        BottomNavItem("Enrolled", "enrolled_courses", Icons.Default.CheckCircle),
         BottomNavItem("Profile", "profile", Icons.Default.Person)
     )
 
@@ -211,8 +338,7 @@ fun HomeBottomNavigation(navController: NavHostController) {
     }
 }
 
-
-// --- Other Composables for HomeScreen ---
+// --- Top Bar ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeTopBar(courseViewModel: CourseViewModel) {
@@ -220,7 +346,7 @@ fun HomeTopBar(courseViewModel: CourseViewModel) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("👋", fontSize = 24.sp)
+                Text("Hi", fontSize = 24.sp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "Welcome back, $username",
@@ -233,149 +359,3 @@ fun HomeTopBar(courseViewModel: CourseViewModel) {
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )
 }
-
-@Composable
-fun YourCoursesSection() {
-    val courses = listOf(
-        Course("Machine Learning Basics", 12, 0.68f),
-        Course("Python for Data Science", 8, 0.85f),
-        Course("Advanced Android", 20, 0.30f)
-    )
-
-    Column {
-        SectionHeader(title = "Your Courses")
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
-            items(courses) { course ->
-                CourseProgressCard(course)
-            }
-        }
-    }
-}
-
-@Composable
-fun CourseProgressCard(course: Course) {
-    Card(
-        modifier = Modifier.width(280.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(course.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.textPrimary)
-            Text("${course.lessonCount} lessons", fontSize = 14.sp, color = AppColors.textSecondary)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Progress", fontSize = 12.sp, color = AppColors.textSecondary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(
-                    progress = { course.progress },
-                    modifier = Modifier.weight(1f).height(8.dp).clip(CircleShape),
-                    color = AppColors.progressGreen,
-                    trackColor = AppColors.background
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("${(course.progress * 100).toInt()}%", fontWeight = FontWeight.SemiBold, color = AppColors.primary)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { /* Handle continue */ },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Continue", color = AppColors.onPrimary)
-            }
-        }
-    }
-}
-
-@Composable
-fun DiscoverCoursesSection() {
-    val discoverCourses = listOf(
-        DiscoverCourse("Natural Language Processing", "Alex Morgan", "2,458 students", "AI", "Beginner", 0),
-        DiscoverCourse("React.js for AI Applications", "Sarah Johnson", "1,872 students", "Web", "Intermediate", 0),
-        DiscoverCourse("Computer Vision Masterclass", "Michael Chen", "3,124 students", "AI", "Advanced", 0)
-    )
-
-    Column {
-        SectionHeader(title = "Discover Courses")
-        discoverCourses.forEach { course ->
-            DiscoverCourseCard(course)
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-fun DiscoverCourseCard(course: DiscoverCourse) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(AppColors.background))
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(course.title, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = AppColors.textPrimary)
-                Text(course.instructor, fontSize = 14.sp, color = AppColors.textSecondary)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, contentDescription = "Students", tint = AppColors.textSecondary, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(course.studentCount, fontSize = 12.sp, color = AppColors.textSecondary)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip(text = course.tag)
-                    Chip(text = course.level)
-                }
-            }
-
-            OutlinedButton(
-                onClick = { /* Handle Join */ },
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.primary),
-                border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(AppColors.primary))
-            ) {
-                Text("Join")
-            }
-        }
-    }
-}
-
-
-@Composable
-fun SectionHeader(title: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
-        Text("See all", fontSize = 14.sp, color = AppColors.accent, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun Chip(text: String) {
-    Box(
-        modifier = Modifier
-            .background(AppColors.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(text, color = AppColors.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-//@Preview(showBackground = true)
-//@Composable
-//fun MainScreenPreview() {
-//    MainScreen(navController = rememberNavController())
-//}

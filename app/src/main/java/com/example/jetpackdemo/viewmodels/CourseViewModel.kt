@@ -59,11 +59,11 @@ class CourseViewModel(
     private val _myCourses = MutableLiveData<Resource<MyCoursesResponse>>()
     val myCourses: LiveData<Resource<MyCoursesResponse>> = _myCourses
 
-    private val _enrolledCourses = MutableLiveData<Resource<CoursesResponse>>()
-    val enrolledCourses: LiveData<Resource<CoursesResponse>> = _enrolledCourses
+    private val _enrolledCourses = MutableLiveData<Resource<enrolledCoursesResponse>>()
+    val enrolledCourses: LiveData<Resource<enrolledCoursesResponse>> = _enrolledCourses
 
-    private val _enroll = MutableLiveData<Resource<EnrollResponse>>()
-    val enroll: LiveData<Resource<EnrollResponse>> = _enroll
+    private val _enrollResult = MutableLiveData<Resource<EnrollResponse>>()
+    val enrollResult: LiveData<Resource<EnrollResponse>> = _enrollResult
 
     // For generation status polling
     private val _generationStatus = MutableStateFlow<Resource<GenerationStatusResponse>?>(null)
@@ -848,6 +848,22 @@ class CourseViewModel(
         }
     }
 
+//    fun getAllPublicCourses() {
+//        viewModelScope.launch {
+//            _publicCourses.postValue(Resource.Loading)
+//            try {
+//                val response = repository.getAllPublicCourses()
+//                if (response.isSuccessful && response.body() != null) {
+//                    _publicCourses.postValue(Resource.Success(response.body()!!))
+//                } else {
+//                    _publicCourses.postValue(Resource.Error("Failed: ${response.code()}"))
+//                }
+//            } catch (e: Exception) {
+//                _publicCourses.postValue(Resource.Error(e.message ?: "Unknown error"))
+//            }
+//        }
+//    }
+
     fun getMyCourses() {
         viewModelScope.launch {
             _myCourses.value = Resource.Loading()
@@ -866,37 +882,40 @@ class CourseViewModel(
 
     fun getEnrolledCourses() {
         viewModelScope.launch {
-            _enrolledCourses.value = Resource.Loading()
+            _enrolledCourses.postValue(Resource.Loading())  // ← postValue
             try {
-                val response = repository.getEnrolledCourses()
-                if (response.isSuccessful) {
-                    _enrolledCourses.value = Resource.Success(response.body()!!)
+                val response = repository.getEnrolledCourses()  // ← Response<enrolledCoursesResponse>
+                if (response.isSuccessful && response.body() != null) {
+                    _enrolledCourses.postValue(Resource.Success(response.body()!!))
                 } else {
-                    _enrolledCourses.value = Resource.Error("Failed: ${response.code()}")
+                    _enrolledCourses.postValue(Resource.Error("Failed: ${response.code()}"))
                 }
             } catch (e: Exception) {
-                _enrolledCourses.value = Resource.Error(e.localizedMessage ?: "Unknown error")
+                _enrolledCourses.postValue(Resource.Error(e.localizedMessage ?: "Unknown error"))
             }
         }
     }
 
     fun enrollInCourse(courseId: String) {
         viewModelScope.launch {
-            _enroll.value = Resource.Loading()
+            _enrollResult.value = Resource.Loading()
             try {
                 val response = repository.enrollInCourse(courseId)
                 if (response.isSuccessful) {
-                    _enroll.value = Resource.Success(response.body()!!)
+                    _enrollResult.value = Resource.Success(response.body()!!)
+                    getEnrolledCourses()
                 } else {
-                    _enroll.value = Resource.Error("Failed: ${response.code()}")
+                    _enrollResult.value = Resource.Error("Failed: ${response.code()}")
                 }
             } catch (e: Exception) {
-                _enroll.value = Resource.Error(e.localizedMessage ?: "Unknown error")
+                _enrollResult.value = Resource.Error(e.localizedMessage ?: "Unknown error")
             }
         }
     }
 
 
-
+    fun clearEnrollResult() {
+        _enrollResult.value = Resource.Loading()
+    }
 
 }
