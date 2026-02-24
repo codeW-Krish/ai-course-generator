@@ -14,21 +14,34 @@ import com.example.jetpackdemo.data.model.GenerateOutlineResponse
 import com.example.jetpackdemo.data.model.GeneratedSubtopicContent
 import com.example.jetpackdemo.data.model.GenerationStatusResponse
 import com.example.jetpackdemo.data.model.GlobalSettingsResponse
+import com.example.jetpackdemo.data.model.InteractiveChatRequest
+import com.example.jetpackdemo.data.model.InteractiveChatResponse
+import com.example.jetpackdemo.data.model.InteractiveSessionResponse
 import com.example.jetpackdemo.data.model.LoginRequest
 import com.example.jetpackdemo.data.model.MyCoursesResponse
 import com.example.jetpackdemo.data.model.NoteResponse
 import com.example.jetpackdemo.data.model.ProgressItem
-import com.example.jetpackdemo.data.model.RefreshRequest
-import com.example.jetpackdemo.data.model.RefreshResponse
+import com.example.jetpackdemo.data.model.RefreshValidationResponse
 import com.example.jetpackdemo.data.model.RegisterRequest
 import com.example.jetpackdemo.data.model.SearchResponse
 import com.example.jetpackdemo.data.model.UpdateDefaultProvidersRequest
 import com.example.jetpackdemo.data.model.UpdateProvidersRequest
+import com.example.jetpackdemo.data.model.VerifyAnswerRequest
+import com.example.jetpackdemo.data.model.VerifyAnswerResponse
 import com.example.jetpackdemo.data.model.enrolledCoursesResponse
+import com.example.jetpackdemo.data.model.GetFlashcardsResponse
+import com.example.jetpackdemo.data.model.ReviewFlashcardRequest
+import com.example.jetpackdemo.data.model.ReviewFlashcardResponse
+import com.example.jetpackdemo.data.model.GetDueFlashcardsResponse
+import com.example.jetpackdemo.data.model.GetGeneratedNotesResponse
+import com.example.jetpackdemo.data.model.ExportSubtopicNotesResponse
+import com.example.jetpackdemo.data.model.ExportCourseNotesResponse
+import com.example.jetpackdemo.data.model.GetAudioResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -44,8 +57,8 @@ interface ApiService {
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
     // Refresh Token
-    @POST("/api/auth/refresh")
-    suspend fun refresh(@Body request: RefreshRequest): Response<RefreshResponse>
+//    @POST("/api/auth/refresh")
+//    suspend fun refresh(@Body request: RefreshRequest): Response<RefreshResponse>
 
     // Generate Outline
     @POST("/api/courses/generate-outline")
@@ -136,17 +149,127 @@ interface ApiService {
     @DELETE("/api/courses/{id}")
     suspend fun deleteCourse(@Path("id") id: String): Response<GenericResponse>
 
-    @POST("/api/subtopics/{id}/notes")
+    @POST("/api/courses/subtopics/{id}/notes")
     suspend fun saveNote(@Path("id") id: String, @Body body: Map<String, String>): Response<GenericResponse>
 
-    @GET("/api/subtopics/{id}/notes")
+    @GET("/api/courses/subtopics/{id}/notes")
     suspend fun getNote(@Path("id") id: String): Response<NoteResponse>
 
-    @POST("/api/subtopics/{id}/complete")
+    @POST("/api/courses/subtopics/{id}/complete")
     suspend fun markComplete(@Path("id") id: String, @Body body: Map<String, Boolean>): Response<GenericResponse>
 
     @GET("/api/courses/{id}/progress")
     suspend fun getProgress(@Path("id") id: String): Response<List<ProgressItem>>
+
+    @POST("/api/auth/refresh")
+    suspend fun refresh(@Header("Authorization") authorization: String): Response<RefreshValidationResponse>
+
+    // === INTERACTIVE LEARNING MODE ===
+    
+    /**
+     * Get the next uncompleted subtopic for a course.
+     * Generates content + questions if not already generated.
+     * Returns course_completed: true if all subtopics are done.
+     */
+    @GET("/api/interactive/course/{courseId}/next")
+    suspend fun getNextInteractiveSubtopic(
+        @Path("courseId") courseId: String,
+        @Query("provider") provider: String = "Groq"
+    ): Response<InteractiveSessionResponse>
+
+    /**
+     * Get a specific subtopic session (for resuming)
+     */
+    @GET("/api/interactive/{subtopicId}")
+    suspend fun getInteractiveSession(
+        @Path("subtopicId") subtopicId: String,
+        @Query("provider") provider: String = "Groq"
+    ): Response<InteractiveSessionResponse>
+
+    /**
+     * Verify answer for a question.
+     * If correct and last question, marks subtopic as completed.
+     */
+    @POST("/api/interactive/{subtopicId}/verify")
+    suspend fun verifyAnswer(
+        @Path("subtopicId") subtopicId: String,
+        @Body request: VerifyAnswerRequest
+    ): Response<VerifyAnswerResponse>
+
+    /**
+     * Ask AI a question within the context of a subtopic.
+     */
+    @POST("/api/interactive/{subtopicId}/chat")
+    suspend fun sendInteractiveChat(
+        @Path("subtopicId") subtopicId: String,
+        @Body request: InteractiveChatRequest
+    ): Response<InteractiveChatResponse>
+
+    // === AUTH: LOGOUT ===
+    @POST("/api/auth/logout")
+    suspend fun logout(): Response<GenericResponse>
+
+    // === COURSES: UNENROLL ===
+    @DELETE("/api/courses/{id}/unenroll")
+    suspend fun unenrollFromCourse(@Path("id") courseId: String): Response<GenericResponse>
+
+    // === FLASHCARDS ===
+    @GET("/api/flashcards/{subtopicId}")
+    suspend fun getFlashcards(
+        @Path("subtopicId") subtopicId: String,
+        @Query("provider") provider: String? = null,
+        @Query("model") model: String? = null
+    ): Response<GetFlashcardsResponse>
+
+    @POST("/api/flashcards/{flashcardId}/review")
+    suspend fun reviewFlashcard(
+        @Path("flashcardId") flashcardId: String,
+        @Body request: ReviewFlashcardRequest
+    ): Response<ReviewFlashcardResponse>
+
+    @GET("/api/flashcards/course/{courseId}/due")
+    suspend fun getDueFlashcards(
+        @Path("courseId") courseId: String
+    ): Response<GetDueFlashcardsResponse>
+
+    // === AI NOTES ===
+    @GET("/api/notes/{subtopicId}/generated")
+    suspend fun getGeneratedNotes(
+        @Path("subtopicId") subtopicId: String,
+        @Query("provider") provider: String? = null,
+        @Query("model") model: String? = null
+    ): Response<GetGeneratedNotesResponse>
+
+    @GET("/api/notes/{subtopicId}/export")
+    suspend fun exportSubtopicNotes(
+        @Path("subtopicId") subtopicId: String,
+        @Query("format") format: String = "json"
+    ): Response<ExportSubtopicNotesResponse>
+
+    @GET("/api/notes/course/{courseId}/export")
+    suspend fun exportCourseNotes(
+        @Path("courseId") courseId: String,
+        @Query("format") format: String = "json"
+    ): Response<ExportCourseNotesResponse>
+
+    // === AUDIO ===
+    @GET("/api/audio/{subtopicId}")
+    suspend fun getSubtopicAudio(
+        @Path("subtopicId") subtopicId: String,
+        @Query("tts_provider") ttsProvider: String? = null,
+        @Query("voice") voice: String? = null,
+        @Query("llm_provider") llmProvider: String? = null,
+        @Query("llm_model") llmModel: String? = null
+    ): Response<GetAudioResponse>
+
+    @GET("/api/audio/course/{courseId}")
+    suspend fun getCourseAudio(
+        @Path("courseId") courseId: String,
+        @Query("tts_provider") ttsProvider: String? = null,
+        @Query("voice") voice: String? = null,
+        @Query("llm_provider") llmProvider: String? = null,
+        @Query("llm_model") llmModel: String? = null
+    ): Response<GetAudioResponse>
 
 }
 

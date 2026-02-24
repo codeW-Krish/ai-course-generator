@@ -134,8 +134,11 @@ fun LoginScreen(navController: NavHostController, courseViewModel: CourseViewMod
                             if (response.isSuccessful) {
                                 val body = response.body()!!
 
-                                // === SAVE TOKENS ===
-                                tokenManager.saveTokens(body.accessToken, body.refreshToken)
+                                // === SAVE TOKEN (contract-compatible + legacy fallback) ===
+                                val authToken = body.token ?: body.accessToken
+                                if (!authToken.isNullOrBlank()) {
+                                    tokenManager.saveIdToken(authToken)
+                                }
 
                                 // === SAVE USER ROLE (Critical for RBAC) ===
                                 body.user.role?.let { role ->

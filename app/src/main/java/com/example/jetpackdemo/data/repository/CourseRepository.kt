@@ -86,5 +86,9 @@ class CourseRepository(private val api: ApiService) {
     suspend fun markComplete(id: String, completed: Boolean) = api.markComplete(id, mapOf("completed" to completed))
     suspend fun getCourseProgress(courseId: String) = api.getProgress(courseId)
 
+    // Unenroll from course
+    suspend fun unenrollFromCourse(courseId: String) = api.unenrollFromCourse(courseId)
 
+    // Logout (server-side session invalidation)
+    suspend fun logout() = api.logout()
 }

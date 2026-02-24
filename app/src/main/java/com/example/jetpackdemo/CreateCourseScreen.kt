@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +83,7 @@ fun CreateCourseScreen(
     var includeYouTube by remember { mutableStateOf(false) }
     var numberOfUnits by remember { mutableStateOf(0) }
     var difficultyLevel by remember { mutableStateOf("") }
+    var isInteractiveMode by remember { mutableStateOf(false) } // Normal vs Interactive
 
     // ────── VIEWMODEL STATE ──────
     val contentProvider by courseViewModel.selectedContentProvider.collectAsState()
@@ -167,7 +169,10 @@ fun CreateCourseScreen(
                                 outlineProvider = selectedOutlineProvider
                             )
 
-                            // 2. Prepare the request (outline provider is used for outline generation)
+                            // 2. Set the learning mode (normal vs interactive)
+                            courseViewModel.setIsInteractiveMode(isInteractiveMode)
+
+                            // 3. Prepare the request (outline provider is used for outline generation)
                             courseViewModel.prepareOutlineRequest(
                                 title = courseTitle,
                                 description = courseDescription,
@@ -281,6 +286,34 @@ fun CreateCourseScreen(
                         uncheckedTrackColor = AppColors.textSecondary.copy(alpha = 0.2f)
                     )
                 )
+            }
+
+            // ── Learning Mode Selection ──
+            FormSection(
+                label = "Interactive Learning Mode",
+                hint = if (isInteractiveMode) "Quiz-based learning with hearts & hints" else "Traditional content generation"
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isInteractiveMode) "Interactive (Quiz Mode)" else "Normal (Read Mode)",
+                        color = if (isInteractiveMode) AppColors.primary else AppColors.textSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Switch(
+                        checked = isInteractiveMode,
+                        onCheckedChange = { isInteractiveMode = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = AppColors.primary,
+                            checkedTrackColor = AppColors.primary.copy(alpha = 0.5f),
+                            uncheckedThumbColor = AppColors.textSecondary,
+                            uncheckedTrackColor = AppColors.textSecondary.copy(alpha = 0.2f)
+                        )
+                    )
+                }
             }
 
             // ── PROVIDER SELECTION SECTION ──

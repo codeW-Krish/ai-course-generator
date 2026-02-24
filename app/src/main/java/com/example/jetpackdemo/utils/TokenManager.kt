@@ -18,12 +18,25 @@ class TokenManager(context: Context) {
     )
 
     companion object {
-        private const val ACCESS_TOKEN = "access_token"
-        private const val REFRESH_TOKEN = "refresh_token"
+        private const val ID_TOKEN = "id_token"
+        private const val ACCESS_TOKEN = "access_token_legacy"
+        private const val REFRESH_TOKEN = "refresh_token_legacy"
+    }
+
+    fun saveIdToken(idToken: String) {
+        with(sharedPreferences.edit()) {
+            putString(ID_TOKEN, idToken)
+            apply()
+        }
+    }
+
+    fun getIdToken(): String? {
+        return sharedPreferences.getString(ID_TOKEN, null)
     }
 
     fun saveTokens(accessToken: String, refreshToken: String) {
         with(sharedPreferences.edit()) {
+            putString(ID_TOKEN, accessToken)
             putString(ACCESS_TOKEN, accessToken)
             putString(REFRESH_TOKEN, refreshToken)
             apply()
@@ -31,7 +44,7 @@ class TokenManager(context: Context) {
     }
 
     fun getAccessToken(): String? {
-        return sharedPreferences.getString(ACCESS_TOKEN, null)
+        return sharedPreferences.getString(ID_TOKEN, null)
     }
 
     fun getRefreshToken(): String? {
@@ -40,6 +53,7 @@ class TokenManager(context: Context) {
 
     fun clearTokens() {
         with(sharedPreferences.edit()) {
+            remove(ID_TOKEN)
             remove(ACCESS_TOKEN)
             remove(REFRESH_TOKEN)
             apply()

@@ -87,10 +87,69 @@ class CourseViewModel(
     private val _courseId = MutableStateFlow<String?>(null)
     val courseId = _courseId.asStateFlow()
 
+    // Interactive learning: ordered list of all subtopic IDs in current course
+    private val _interactiveSubtopicIds = MutableStateFlow<List<String>>(emptyList())
+    val interactiveSubtopicIds = _interactiveSubtopicIds.asStateFlow()
+
+    // Current index in the interactive flow
+    private val _currentInteractiveIndex = MutableStateFlow(0)
+    val currentInteractiveIndex = _currentInteractiveIndex.asStateFlow()
+
+    // Whether the course is being created in Interactive Mode (quiz-based) vs Normal Mode (read-based)
+    private val _isInteractiveMode = MutableStateFlow(false)
+    val isInteractiveMode = _isInteractiveMode.asStateFlow()
+
+    /**
+     * Set whether we're creating an interactive (quiz) course or normal (read) course
+     */
+    fun setIsInteractiveMode(interactive: Boolean) {
+        _isInteractiveMode.value = interactive
+    }
 
     // In CourseViewModel.kt
     fun setCourseId(id: String) {
         _courseId.value = id
+    }
+
+    /**
+     * Set the list of subtopic IDs for interactive learning (in order)
+     */
+    fun setInteractiveSubtopics(subtopicIds: List<String>) {
+        _interactiveSubtopicIds.value = subtopicIds
+        _currentInteractiveIndex.value = 0
+    }
+
+    /**
+     * Get the next subtopic ID in the sequence (or null if done)
+     */
+    fun getNextInteractiveSubtopicId(): String? {
+        val ids = _interactiveSubtopicIds.value
+        val currentIdx = _currentInteractiveIndex.value
+        return if (currentIdx + 1 < ids.size) {
+            ids[currentIdx + 1]
+        } else null
+    }
+
+    /**
+     * Advance to the next subtopic and return its ID (or null if done)
+     */
+    fun advanceToNextSubtopic(): String? {
+        val ids = _interactiveSubtopicIds.value
+        val currentIdx = _currentInteractiveIndex.value
+        if (currentIdx + 1 < ids.size) {
+            _currentInteractiveIndex.value = currentIdx + 1
+            return ids[currentIdx + 1]
+        }
+        return null
+    }
+
+    /**
+     * Check if this is the last subtopic
+     */
+    fun isLastSubtopic(): Boolean {
+        val ids = _interactiveSubtopicIds.value
+        val currentIdx = _currentInteractiveIndex.value
+        return currentIdx >= ids.size - 1
     }
 
     // Add these state flows to your CourseViewModel

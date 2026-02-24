@@ -73,6 +73,8 @@ fun BottomNavGraph(
         composable("home") {
             HomeScreen(
                 onCreateCourseClicked = { appNavController.navigate("create_course") },
+                onInteractiveDemoClicked = { appNavController.navigate("interactive_demo") },
+                onCoursePreviewClicked = { courseId -> bottomBarNavController.navigate("course_preview/$courseId") },
                 courseViewModel = courseViewModel,
                 onSeeAllPublic = { bottomBarNavController.navigate("public_courses") }
             )
@@ -127,7 +129,22 @@ fun BottomNavGraph(
             )
         }
 
-
+        // Course Preview Screen
+        composable("course_preview/{courseId}") { backStackEntry ->
+            val courseId = backStackEntry.arguments?.getString("courseId") ?: return@composable
+            CoursePreviewScreen(
+                courseId = courseId,
+                navController = bottomBarNavController,
+                courseViewModel = courseViewModel,
+                onEnroll = { courseViewModel.enrollInCourse(courseId) },
+                onStartInteractiveLearning = { firstSubtopicId, allSubtopicIds ->
+                    // Navigate to interactive learning with first subtopic
+                    // Pass all IDs via saved state or ViewModel for sequential navigation
+                    courseViewModel.setInteractiveSubtopics(allSubtopicIds)
+                    appNavController.navigate("interactive/$firstSubtopicId")
+                }
+            )
+        }
     }
 }
 
@@ -136,6 +153,8 @@ fun BottomNavGraph(
 @Composable
 fun HomeScreen(
     onCreateCourseClicked: () -> Unit,
+    onInteractiveDemoClicked: () -> Unit,
+    onCoursePreviewClicked: (String) -> Unit,
     courseViewModel: CourseViewModel,
     onSeeAllPublic: () -> Unit
 ) {
@@ -191,10 +210,35 @@ fun HomeScreen(
         ) {
             item { Spacer(Modifier.height(8.dp)) }
 
+            // === INTERACTIVE LEARNING DEMO BUTTON ===
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2D6A4F)),
+                    onClick = onInteractiveDemoClicked
+                ) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text("Try Interactive Learning", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+                            Text("Experience the new quiz-based mode", fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
+                        }
+                    }
+                }
+            }
+            
+            item { Spacer(Modifier.height(8.dp)) }
+
             item {
                 DiscoverCoursesSection(
                     courseViewModel = courseViewModel,
-                    onSeeAllClicked = onSeeAllPublic
+                    onSeeAllClicked = onSeeAllPublic,
+                    onCourseClicked = onCoursePreviewClicked
                 )
             }
 
@@ -206,7 +250,8 @@ fun HomeScreen(
 @Composable
 fun DiscoverCoursesSection(
     courseViewModel: CourseViewModel,
-    onSeeAllClicked: () -> Unit
+    onSeeAllClicked: () -> Unit,
+    onCourseClicked: (String) -> Unit
 ) {
     val publicCoursesState by courseViewModel.publicCourses.observeAsState(Resource.Loading<CoursesResponse>())
 
@@ -215,30 +260,35 @@ fun DiscoverCoursesSection(
 
         when (publicCoursesState) {
             is Resource.Loading -> {
-                Box(modifier = Modifier.height(150.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.height(200.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = AppColors.primary)
                 }
             }
             is Resource.Success -> {
                 val courses = publicCoursesState.data?.courses?.take(5) ?: emptyList()
                 if (courses.isEmpty()) {
-                    Text("No courses available", color = AppColors.textSecondary)
+                    Box(modifier = Modifier.height(150.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No courses available yet", color = AppColors.textSecondary)
+                    }
                 } else {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         items(courses) { course ->
-                            DiscoverCourseCard(
+                            com.example.jetpackdemo.ui.components.PremiumCourseCard(
                                 course = course,
-                                onJoin = { courseViewModel.enrollInCourse(course.id) }  // ← CALL API
+                                onCardClick = { onCourseClicked(course.id) },
+                                onJoinClick = { courseViewModel.enrollInCourse(course.id) }
                             )
                         }
                     }
                 }
             }
             is Resource.Error -> {
-                Text("Error loading courses", color = Color.Red)
+                Box(modifier = Modifier.height(100.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text("Error loading courses", color = Color.Red)
+                }
             }
         }
     }

@@ -17,17 +17,17 @@ data class Users(
 data class AuthResponse(
     val message: String,
     val user: User,
-    val accessToken: String,
-    val refreshToken: String
+    @SerializedName("token")
+    val token: String? = null,
+    @SerializedName("accessToken")
+    val accessToken: String? = null,
+    @SerializedName("refreshToken")
+    val refreshToken: String? = null
 )
 
-// RefreshResponse remains the same
-data class RefreshResponse(
+data class RefreshValidationResponse(
     val message: String,
-    @SerializedName("newAccessToken")
-    val accessToken: String,
-    @SerializedName("newRefreshToken")
-    val refreshToken: String
+    val user: User
 )
 
 // Add new data classes for admin features
@@ -62,18 +62,13 @@ data class UpdateDefaultProvidersRequest(
 
 // Data class for the /auth/register endpoint request body.
 data class RegisterRequest(
+    val username: String,
     val email: String,
-    val password: String,
-    val name: String
+    val password: String
 )
 
 // Data class for the /auth/login endpoint request body.
 data class LoginRequest(
     val email: String,
     val password: String
-)
-
-// The request to get a new access token.
-data class RefreshRequest(
-    val refreshToken: String
 )

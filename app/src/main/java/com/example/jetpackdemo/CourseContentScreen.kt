@@ -277,29 +277,29 @@ fun CourseContentScreen(
                 }
             }
         },
-        bottomBar = {
-            if (currentContent != null) {
-                BottomAppBar(
-                    containerColor = AppColors.surface,
-                    tonalElevation = 8.dp,
-                    actions = {
-                        Button(
-                            onClick = { /* Mark Complete */ },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Mark Complete", fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        OutlinedButton(onClick = { /* Save Note */ }, modifier = Modifier.height(48.dp)) {
-                            Icon(Icons.Default.BookmarkBorder, contentDescription = "Save")
-                        }
-                    }
-                )
-            }
-        }
+//        bottomBar = {
+//            if (currentContent != null) {
+//                BottomAppBar(
+//                    containerColor = AppColors.surface,
+//                    tonalElevation = 8.dp,
+//                    actions = {
+//                        Button(
+//                            onClick = { /* Mark Complete */ },
+//                            modifier = Modifier.weight(1f).height(48.dp),
+//                            shape = RoundedCornerShape(12.dp)
+//                        ) {
+//                            Icon(Icons.Default.Check, contentDescription = null)
+//                            Spacer(Modifier.width(8.dp))
+//                            Text("Mark Complete", fontWeight = FontWeight.SemiBold)
+//                        }
+//                        Spa cer(Modifier.width(12.dp))
+//                        OutlinedButton(onClick = { /* Save Note */ }, modifier = Modifier.height(48.dp)) {
+//                            Icon(Icons.Default.BookmarkBorder, contentDescription = "Save")
+//                        }
+//                    }
+//                )
+//            }
+//        }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             when {// FIXED: Show content if available, regardless of generation status

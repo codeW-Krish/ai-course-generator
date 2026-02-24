@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,7 +52,8 @@ data class UnitItem(
 fun CourseOutlineScreen(
     courseViewModel: CourseViewModel,
     onNavigateBack: () -> Unit,
-    onGenerateContent: () -> Unit
+    onGenerateContent: () -> Unit,
+    onStartInteractiveLearning: (courseId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -59,6 +61,7 @@ fun CourseOutlineScreen(
     val outline by courseViewModel.outlineState.collectAsState()
     val isLoading by courseViewModel.isLoading.collectAsState()
     val updateOutlineResult by courseViewModel.updateOutline.collectAsState()
+    val isInteractiveMode by courseViewModel.isInteractiveMode.collectAsState()
 //    val selectedContentProvider by courseViewModel.selectedOutlineProvider.collectAsState();
 
     var expandedUnitId by remember { mutableStateOf<Int?>(null) }
@@ -192,15 +195,15 @@ fun CourseOutlineScreen(
                     Button(
                         onClick = {
                             if (!courseId.isNullOrEmpty()) {
-                                // Start content generation
-                                // NEW: Start STREAMING generation with provider
-//                                val provider = selectedContentProvider.ifBlank { "Groq" }
-                                val provider = "Groq"
-                                courseViewModel.generateCourseContent(
-                                    courseId = courseId!!
-                                )
-                                // Navigate immediately
-                                onGenerateContent()
+                                if (isInteractiveMode) {
+                                    // Interactive Mode: Skip content generation, go to interactive learning
+                                    // The backend will generate content per-subtopic on demand
+                                    onStartInteractiveLearning(courseId!!)
+                                } else {
+                                    // Normal Mode: Generate all content upfront
+                                    courseViewModel.generateCourseContent(courseId = courseId!!)
+                                    onGenerateContent()
+                                }
                             } else {
                                 Toast.makeText(context, "Course ID not available", Toast.LENGTH_SHORT).show()
                             }
@@ -212,10 +215,14 @@ fun CourseOutlineScreen(
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, tint = AppColors.onPrimary)
+                        Icon(
+                            if (isInteractiveMode) Icons.Default.School else Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = AppColors.onPrimary
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Generate Course Content",
+                            if (isInteractiveMode) "Start Interactive Learning" else "Generate Course Content",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AppColors.onPrimary

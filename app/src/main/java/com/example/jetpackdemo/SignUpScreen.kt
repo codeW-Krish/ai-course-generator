@@ -180,15 +180,18 @@ fun SignUpScreen(navController: NavHostController?) {
                         try {
                             val response = RetrofitClient.publicApi.register(
                                 RegisterRequest(
+                                    username = fullName,
                                     email = email,
-                                    password = password,
-                                    name = fullName
+                                    password = password
                                 )
                             )
 
                             if (response.isSuccessful) {
                                 val body = response.body()!!
-                                tokenManager.saveTokens(body.accessToken, body.refreshToken)
+                                val authToken = body.token ?: body.accessToken
+                                if (!authToken.isNullOrBlank()) {
+                                    tokenManager.saveIdToken(authToken)
+                                }
                                 navController?.navigate("main") {
                                     popUpTo("welcome") { inclusive = true }
                                 }

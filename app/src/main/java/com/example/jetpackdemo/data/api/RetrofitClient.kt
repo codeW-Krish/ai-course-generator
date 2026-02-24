@@ -9,14 +9,12 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    const val BASE_URL = "https://b4cef27d5d0f.ngrok-free.app/" // Use this for Android Emulator
+    const val BASE_URL = "https://32c0-2405-201-2035-237c-e5c1-ea6e-6d57-d81e.ngrok-free.app/"
 
-    // Shared logging interceptor
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
-    // Shared base OkHttpClient (timeouts + logging)
     private val baseOkHttpClient = OkHttpClient.Builder()
         .connectTimeout(50, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
@@ -24,7 +22,6 @@ object RetrofitClient {
         .addInterceptor(loggingInterceptor)
         .build()
 
-    // --- Public API Client (for /login, /register) ---
     val publicApi: ApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -33,16 +30,10 @@ object RetrofitClient {
             .create(ApiService::class.java)
     }
 
-    // --- Authenticated API Client (with AuthInterceptor) ---
-    fun getAuthApi(context: Context): ApiService {
-        val refreshApi = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
 
+    fun getAuthApi(context: Context): ApiService {
         val authClient = baseOkHttpClient.newBuilder()
-            .addInterceptor(AuthInterceptor(context, refreshApi))
+            .addInterceptor(AuthInterceptor(context))
             .build()
 
         return Retrofit.Builder()
@@ -53,16 +44,9 @@ object RetrofitClient {
             .create(ApiService::class.java)
     }
 
-    // --- NEW: Expose OkHttpClient for SSE Streaming ---
     fun getOkHttpClientForSSE(context: Context): OkHttpClient {
-        val refreshApi = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
-
         return baseOkHttpClient.newBuilder()
-            .addInterceptor(AuthInterceptor(context, refreshApi))
+            .addInterceptor(AuthInterceptor(context))
             .addInterceptor(ChunkedEncodingInterceptor())
             .readTimeout(0, TimeUnit.SECONDS)
             .build()
