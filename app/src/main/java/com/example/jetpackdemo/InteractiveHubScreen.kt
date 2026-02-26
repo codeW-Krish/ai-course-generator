@@ -1,0 +1,857 @@
+package com.example.jetpackdemo
+
+import android.app.Application
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.example.jetpackdemo.data.api.RetrofitClient
+import com.example.jetpackdemo.data.model.GeneratedItem
+import com.example.jetpackdemo.data.model.HubActivity
+import com.example.jetpackdemo.data.model.SubtopicFeatureStatus
+import com.example.jetpackdemo.data.repository.InteractiveRepository
+import com.example.jetpackdemo.ui.theme.AppColors
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun InteractiveHubScreen(
+    navController: NavController,
+    courseId: String,
+    subtopicId: String,
+    subtopicTitle: String? = null
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Hub history state
+    var activities by remember { mutableStateOf<List<HubActivity>>(emptyList()) }
+    var featureStatus by remember { mutableStateOf<SubtopicFeatureStatus?>(null) }
+    var allSubtopicStatuses by remember { mutableStateOf<Map<String, SubtopicFeatureStatus>>(emptyMap()) }
+    var generatedItems by remember { mutableStateOf<List<GeneratedItem>>(emptyList()) }
+    var isLoadingHistory by remember { mutableStateOf(true) }
+
+    // Fetch hub history
+    LaunchedEffect(courseId) {
+        isLoadingHistory = true
+        try {
+            val api = RetrofitClient.getAuthApi(context)
+            val repo = InteractiveRepository(api)
+            val response = repo.getHubHistory(courseId)
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                activities = body.activities
+                featureStatus = body.subtopicStatuses[subtopicId]
+                allSubtopicStatuses = body.subtopicStatuses
+                generatedItems = body.generatedItems
+            }
+        } catch (_: Exception) { }
+        isLoadingHistory = false
+    }
+
+    // Log activity helper (NonCancellable so navigation doesn't cancel the request)
+    fun logActivity(featureType: String) {
+        scope.launch(kotlinx.coroutines.NonCancellable) {
+            try {
+                val api = RetrofitClient.getAuthApi(context)
+                val repo = InteractiveRepository(api)
+                repo.logHubActivity(courseId, subtopicId, featureType, subtopicTitle ?: "")
+            } catch (_: Exception) { }
+        }
+    }
+
+    val tabTitles = listOf("Tools", "History")
+    val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
+
+    Scaffold(
+        containerColor = AppColors.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            subtopicTitle ?: "Learning Hub",
+                            color = AppColors.textPrimary,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            "Study Materials",
+                            color = AppColors.textSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = AppColors.textPrimary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // === Tab Bar ===
+            TabRow(
+                selectedTabIndex = pagerState.currentPage,
+                containerColor = AppColors.surface,
+                contentColor = AppColors.primary
+            ) {
+                tabTitles.forEachIndexed { index, title ->
+                    Tab(
+                        selected = pagerState.currentPage == index,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (index == 0) Icons.Default.Build else Icons.Default.History,
+                                    null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(title, fontWeight = FontWeight.SemiBold)
+                                if (index == 1 && generatedItems.isNotEmpty()) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = AppColors.primary.copy(alpha = 0.1f)
+                                    ) {
+                                        Text(
+                                            "${generatedItems.size}",
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                            fontSize = 11.sp,
+                                            color = AppColors.primary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        selectedContentColor = AppColors.primary,
+                        unselectedContentColor = AppColors.textSecondary
+                    )
+                }
+            }
+
+            // === Pager Content ===
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> ToolsTab(
+                        navController = navController,
+                        courseId = courseId,
+                        subtopicId = subtopicId,
+                        subtopicTitle = subtopicTitle,
+                        featureStatus = featureStatus,
+                        activities = activities,
+                        isLoadingHistory = isLoadingHistory,
+                        onLogActivity = { logActivity(it) }
+                    )
+                    1 -> HistoryTab(
+                        navController = navController,
+                        courseId = courseId,
+                        generatedItems = generatedItems,
+                        allSubtopicStatuses = allSubtopicStatuses,
+                        isLoading = isLoadingHistory,
+                        onLogActivity = { type, subId, title -> 
+                            scope.launch(kotlinx.coroutines.NonCancellable) {
+                                try {
+                                    val api = RetrofitClient.getAuthApi(context)
+                                    val repo = InteractiveRepository(api)
+                                    repo.logHubActivity(courseId, subId, type, title)
+                                } catch (_: Exception) { }
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// =======================================================
+//  Tab 1: Tools — feature cards for current subtopic
+// =======================================================
+@Composable
+private fun ToolsTab(
+    navController: NavController,
+    courseId: String,
+    subtopicId: String,
+    subtopicTitle: String?,
+    featureStatus: SubtopicFeatureStatus?,
+    activities: List<HubActivity>,
+    isLoadingHistory: Boolean,
+    onLogActivity: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // === Recent Activity Section ===
+        if (!isLoadingHistory && activities.isNotEmpty()) {
+            Text(
+                "Recent Activity",
+                color = AppColors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    activities.take(5).forEach { activity ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val (icon, color) = featureIconAndColor(activity.featureType)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = color.copy(alpha = 0.1f),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    featureLabel(activity.featureType),
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp,
+                                    color = AppColors.textPrimary
+                                )
+                                if (activity.title.isNotBlank()) {
+                                    Text(
+                                        activity.title,
+                                        fontSize = 12.sp,
+                                        color = AppColors.textSecondary,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            if (activity.createdAt != null) {
+                                Text(
+                                    formatTimestamp(activity.createdAt),
+                                    fontSize = 11.sp,
+                                    color = AppColors.textSecondary.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+
+        // === Feature Cards ===
+        Text(
+            "Choose a learning tool",
+            color = AppColors.textSecondary,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        HubFeatureCard(
+            icon = Icons.Default.Style,
+            title = "Flashcards",
+            description = "Review key concepts with spaced repetition flashcards",
+            accentColor = AppColors.primary,
+            hasGenerated = featureStatus?.hasFlashcards == true,
+            onClick = {
+                onLogActivity("flashcards")
+                val title = subtopicTitle ?: "Flashcards"
+                navController.navigate("flashcards/$subtopicId/$title")
+            }
+        )
+
+        HubFeatureCard(
+            icon = Icons.Default.Description,
+            title = "AI Notes",
+            description = "Read AI-generated structured notes with examples and analogies",
+            accentColor = Color(0xFF8B5CF6),
+            hasGenerated = featureStatus?.hasNotes == true,
+            onClick = {
+                onLogActivity("notes")
+                val title = subtopicTitle ?: "Notes"
+                navController.navigate("notes/$subtopicId/$title")
+            }
+        )
+
+        HubFeatureCard(
+            icon = Icons.Default.Headphones,
+            title = "Audio Overview",
+            description = "Listen to an audio summary of this topic",
+            accentColor = Color(0xFFF59E0B),
+            hasGenerated = featureStatus?.hasAudio == true,
+            onClick = {
+                onLogActivity("audio")
+                val title = subtopicTitle ?: "Audio"
+                navController.navigate("audio_subtopic/$subtopicId/$title")
+            }
+        )
+
+        HubFeatureCard(
+            icon = Icons.AutoMirrored.Filled.Chat,
+            title = "AI Tutor Chat",
+            description = "Ask questions and get explanations from the AI tutor",
+            accentColor = AppColors.progressGreen,
+            onClick = {
+                onLogActivity("chat")
+                val title = subtopicTitle ?: "Chat"
+                navController.navigate("tutor_chat/$subtopicId/$title")
+            }
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            "Course Level",
+            color = AppColors.textPrimary,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        HubFeatureCard(
+            icon = Icons.Default.GraphicEq,
+            title = "Course Audio",
+            description = "Listen to a full course audio overview",
+            accentColor = Color(0xFFEC4899),
+            onClick = {
+                onLogActivity("course_audio")
+                val title = subtopicTitle ?: "Course Audio"
+                navController.navigate("audio_course/$courseId/$title")
+            }
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Back to Learning", fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+// =======================================================
+//  Tab 2: History — all generated content across course
+// =======================================================
+@Composable
+private fun HistoryTab(
+    navController: NavController,
+    courseId: String,
+    generatedItems: List<GeneratedItem>,
+    allSubtopicStatuses: Map<String, SubtopicFeatureStatus>,
+    isLoading: Boolean,
+    onLogActivity: (type: String, subtopicId: String, title: String) -> Unit
+) {
+    var selectedFilter by remember { mutableStateOf("all") }
+
+    val filters = listOf("all", "notes", "flashcards", "audio", "course_audio")
+
+    val filteredItems = remember(generatedItems, selectedFilter) {
+        if (selectedFilter == "all") generatedItems
+        else generatedItems.filter { it.type == selectedFilter }
+    }
+
+    // Group by subtopic (for "all" view, group by subtopicTitle)
+    val groupedBySubtopic = remember(allSubtopicStatuses) {
+        allSubtopicStatuses.entries
+            .filter { it.value.hasFlashcards || it.value.hasNotes || it.value.hasAudio }
+            .groupBy { it.value.unitTitle ?: "" }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Filter chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filters.forEach { filter ->
+                val label = when (filter) {
+                    "all" -> "All"
+                    "notes" -> "Notes"
+                    "flashcards" -> "Cards"
+                    "audio" -> "Audio"
+                    "course_audio" -> "Course"
+                    else -> filter
+                }
+                val count = if (filter == "all") generatedItems.size
+                else generatedItems.count { it.type == filter }
+
+                FilterChip(
+                    selected = selectedFilter == filter,
+                    onClick = { selectedFilter = filter },
+                    label = {
+                        Text(
+                            if (count > 0) "$label ($count)" else label,
+                            fontSize = 12.sp
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AppColors.primary.copy(alpha = 0.12f),
+                        selectedLabelColor = AppColors.primary,
+                    ),
+                    modifier = Modifier.height(32.dp)
+                )
+            }
+        }
+
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppColors.primary, modifier = Modifier.size(32.dp))
+            }
+        } else if (selectedFilter == "all" && groupedBySubtopic.isNotEmpty()) {
+            // Grouped view: by unit → subtopics with their generated features
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                groupedBySubtopic.forEach { (unitTitle, subtopicEntries) ->
+                    // Unit header
+                    item(key = "unit_$unitTitle") {
+                        Text(
+                            unitTitle.ifBlank { "Course Content" },
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = AppColors.textSecondary,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                    }
+
+                    items(
+                        items = subtopicEntries,
+                        key = { "subtopic_${it.key}" }
+                    ) { (subtopicId, status) ->
+                        SubtopicHistoryCard(
+                            subtopicId = subtopicId,
+                            status = status,
+                            courseId = courseId,
+                            navController = navController,
+                            onLogActivity = onLogActivity
+                        )
+                    }
+                }
+
+                // Spacer at bottom for comfortable scrolling
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        } else if (filteredItems.isNotEmpty()) {
+            // Flat list view (when filtering by specific type)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = filteredItems,
+                    key = { "${it.type}_${it.subtopicId ?: it.courseId}" }
+                ) { item ->
+                    GeneratedItemCard(
+                        item = item,
+                        courseId = courseId,
+                        navController = navController,
+                        onLogActivity = onLogActivity
+                    )
+                }
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        } else {
+            // Empty state
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.FolderOpen,
+                        null,
+                        tint = AppColors.textSecondary.copy(alpha = 0.4f),
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "No generated content yet",
+                        color = AppColors.textSecondary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        "Use the Tools tab to generate flashcards, notes, or audio",
+                        color = AppColors.textSecondary.copy(alpha = 0.7f),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(start = 32.dp, end = 32.dp).padding(top = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// =======================================================
+//  Subtopic History Card — shows all features for one subtopic
+// =======================================================
+@Composable
+private fun SubtopicHistoryCard(
+    subtopicId: String,
+    status: SubtopicFeatureStatus,
+    courseId: String,
+    navController: NavController,
+    onLogActivity: (type: String, subtopicId: String, title: String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            // Subtopic title
+            Text(
+                status.title,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                color = AppColors.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(10.dp))
+
+            // Feature buttons
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (status.hasNotes) {
+                    FeatureActionChip(
+                        icon = Icons.Default.Description,
+                        label = "Notes",
+                        color = Color(0xFF8B5CF6),
+                        onClick = {
+                            onLogActivity("notes", subtopicId, status.title)
+                            navController.navigate("notes/$subtopicId/${status.title}")
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (status.hasFlashcards) {
+                    FeatureActionChip(
+                        icon = Icons.Default.Style,
+                        label = "Cards",
+                        color = AppColors.primary,
+                        onClick = {
+                            onLogActivity("flashcards", subtopicId, status.title)
+                            navController.navigate("flashcards/$subtopicId/${status.title}")
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (status.hasAudio) {
+                    FeatureActionChip(
+                        icon = Icons.Default.Headphones,
+                        label = "Audio",
+                        color = Color(0xFFF59E0B),
+                        onClick = {
+                            onLogActivity("audio", subtopicId, status.title)
+                            navController.navigate("audio_subtopic/$subtopicId/${status.title}")
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// =======================================================
+//  Generated Item Card — single flat item (for filtered view)
+// =======================================================
+@Composable
+private fun GeneratedItemCard(
+    item: GeneratedItem,
+    courseId: String,
+    navController: NavController,
+    onLogActivity: (type: String, subtopicId: String, title: String) -> Unit
+) {
+    val (icon, color) = featureIconAndColor(item.type)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                val subId = item.subtopicId ?: return@clickable
+                val title = item.subtopicTitle
+                onLogActivity(item.type, subId, title)
+                when (item.type) {
+                    "notes" -> navController.navigate("notes/$subId/$title")
+                    "flashcards" -> navController.navigate("flashcards/$subId/$title")
+                    "audio" -> navController.navigate("audio_subtopic/$subId/$title")
+                    "course_audio" -> navController.navigate("audio_course/$courseId/$title")
+                }
+            },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = color.copy(alpha = 0.1f),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    item.subtopicTitle,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    color = AppColors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = color.copy(alpha = 0.08f)
+                    ) {
+                        Text(
+                            featureLabel(item.type),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                            fontSize = 11.sp,
+                            color = color,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    if (item.unitTitle != null) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            item.unitTitle,
+                            fontSize = 11.sp,
+                            color = AppColors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                // Extra info based on type
+                when (item.type) {
+                    "flashcards" -> if (item.cardCount > 0) {
+                        Text(
+                            "${item.cardCount} cards",
+                            fontSize = 11.sp,
+                            color = AppColors.textSecondary
+                        )
+                    }
+                    "audio", "course_audio" -> if (item.estimatedDuration > 0) {
+                        Text(
+                            "~${item.estimatedDuration / 60}m ${item.estimatedDuration % 60}s",
+                            fontSize = 11.sp,
+                            color = AppColors.textSecondary
+                        )
+                    }
+                }
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                "Open",
+                tint = AppColors.textSecondary.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+// =======================================================
+//  Feature Action Chip — button for opening a feature
+// =======================================================
+@Composable
+private fun FeatureActionChip(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = color.copy(alpha = 0.08f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = color
+            )
+        }
+    }
+}
+
+@Composable
+private fun HubFeatureCard(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    accentColor: Color,
+    hasGenerated: Boolean = false,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = accentColor.copy(alpha = 0.1f),
+                modifier = Modifier.size(52.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, title, tint = accentColor, modifier = Modifier.size(28.dp))
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        color = AppColors.textPrimary
+                    )
+                    if (hasGenerated) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = AppColors.progressGreen.copy(alpha = 0.1f)
+                        ) {
+                            Text(
+                                "Generated",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 10.sp,
+                                color = AppColors.progressGreen,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    description,
+                    fontSize = 13.sp,
+                    color = AppColors.textSecondary,
+                    lineHeight = 18.sp
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                "Open",
+                tint = AppColors.textSecondary.copy(alpha = 0.5f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+private fun featureIconAndColor(featureType: String): Pair<ImageVector, Color> {
+    return when (featureType) {
+        "flashcards" -> Icons.Default.Style to Color(0xFF6366F1)
+        "notes" -> Icons.Default.Description to Color(0xFF8B5CF6)
+        "audio" -> Icons.Default.Headphones to Color(0xFFF59E0B)
+        "chat" -> Icons.Default.Chat to Color(0xFF22C55E)
+        "course_audio" -> Icons.Default.GraphicEq to Color(0xFFEC4899)
+        "content" -> Icons.Default.MenuBook to Color(0xFF3B82F6)
+        else -> Icons.Default.History to Color(0xFF6B7280)
+    }
+}
+
+private fun featureLabel(featureType: String): String {
+    return when (featureType) {
+        "flashcards" -> "Flashcards"
+        "notes" -> "AI Notes"
+        "audio" -> "Audio Overview"
+        "chat" -> "AI Tutor Chat"
+        "course_audio" -> "Course Audio"
+        "content" -> "Content Read"
+        else -> featureType.replaceFirstChar { it.uppercase() }
+    }
+}
+
+private fun formatTimestamp(timestamp: String): String {
+    return try {
+        // Simple extraction of date portion from ISO string
+        if (timestamp.length >= 10) timestamp.substring(5, 10) else timestamp
+    } catch (_: Exception) { timestamp }
+}

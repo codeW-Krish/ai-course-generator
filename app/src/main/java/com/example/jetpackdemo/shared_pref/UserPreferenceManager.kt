@@ -35,6 +35,7 @@ class UserPreferencesManager(context: Context) {
     }
 
     fun getUsername(): String? = sharedPreferences.getString("username", null)
+    fun getUserId(): String? = sharedPreferences.getString("user_id", null)
     fun getEmail(): String? = sharedPreferences.getString("user_email", null)
 
     // Add role management

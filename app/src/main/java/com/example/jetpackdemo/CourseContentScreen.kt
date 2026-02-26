@@ -149,24 +149,18 @@ fun CourseContentScreen(
                     val firstContent = data!!.units
                         .flatMap { it.subtopics }
                         .firstOrNull {
-                            // FIXED: Better content detection
-                            it.content != null &&
-                                    it.content != "null" &&
-                                    it.content.isNotEmpty() &&
-                                    !it.content.trim().equals("[]", ignoreCase = true) &&
-                                    !it.content.contains("Content is being generated") &&
-                                    (it.content.trim().startsWith("[") || it.content.trim().startsWith("{")) &&
-                                    parseGeneratedContent(it.content) != null
+                            // FIXED: content is now a typed object, not a string
+                            it.content != null
                         }
 
                     if (firstContent != null) {
                         selectedSubtopic = firstContent
-                        Log.d("UI_AUTO_SELECT", "✅ Auto-selected subtopic: ${firstContent.title} with content: ${firstContent.content?.take(50)}...")
+                        Log.d("UI_AUTO_SELECT", "✅ Auto-selected subtopic: ${firstContent.title}")
                     } else {
                         Log.d("UI_AUTO_SELECT", "❌ No valid content found in subtopics")
                         // Debug: log all subtopics
                         data.units.flatMap { it.subtopics }.forEach { sub ->
-                            Log.d("UI_AUTO_SELECT", "Subtopic: ${sub.title}, Content: ${sub.content?.take(100)}")
+                            Log.d("UI_AUTO_SELECT", "Subtopic: ${sub.title}, Has content: ${sub.content != null}")
                         }
                     }
                 }
@@ -187,14 +181,8 @@ fun CourseContentScreen(
                         .flatMap { it.subtopics }
                         .find { it.id == sub.id }
                         ?.let {
-                            // FIXED: Check if content is valid before converting
-                            if (it.content != null &&
-                                it.content != "null" &&
-                                it.content.isNotEmpty() &&
-                                !it.content.trim().equals("[]", ignoreCase = true) &&
-                                !it.content.contains("Content is being generated") &&
-                                (it.content.trim().startsWith("[") || it.content.trim().startsWith("{")) &&
-                                parseGeneratedContent(it.content) != null) {
+                            // FIXED: content is now a typed object, just check for null
+                            if (it.content != null) {
                                 convertToSubTopicContent(it)
                             } else {
                                 null
@@ -371,14 +359,8 @@ fun CourseContentScreen(
                             courseData = courseData!!,
                             selectedSubtopicId = selectedSubtopic?.id,
                             onSubTopicSelected = { sub ->
-                                // FIXED: Better content detection
-                                val hasValidContent = sub.content != null &&
-                                        sub.content != "null" &&
-                                        sub.content.isNotEmpty() &&
-                                        !sub.content.trim().equals("[]", ignoreCase = true) &&
-                                        !sub.content.contains("Content is being generated") &&
-                                        (sub.content.trim().startsWith("[") || sub.content.trim().startsWith("{")) &&
-                                        parseGeneratedContent(sub.content) != null
+                                // FIXED: content is now a typed object
+                                val hasValidContent = sub.content != null
 
                                 if (hasValidContent) {
                                     selectedSubtopic = sub
@@ -1215,10 +1197,10 @@ private fun normalizeGeneratedContent(original: GeneratedSubtopicContent): Gener
 
 private fun convertToSubTopicContent(subtopic: Subtopic): SubTopicContent? {
     return try {
-        // First parse the backend JSON
-        val parsedContent = parseGeneratedContent(subtopic.content)
+        // Content is now a typed GeneratedSubtopicContent object
+        val parsedContent = subtopic.content
         if (parsedContent == null) {
-            Log.e("CONTENT_CONVERSION", "Failed to parse content for: ${subtopic.title}")
+            Log.e("CONTENT_CONVERSION", "No content for: ${subtopic.title}")
             return null
         }
 

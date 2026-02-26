@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    const val BASE_URL = "https://32c0-2405-201-2035-237c-e5c1-ea6e-6d57-d81e.ngrok-free.app/"
+    const val BASE_URL = "https://b7f1-2405-201-2035-237c-259b-68f0-86d4-710d.ngrok-free.app"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -25,6 +25,7 @@ object RetrofitClient {
     val publicApi: ApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(baseOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)

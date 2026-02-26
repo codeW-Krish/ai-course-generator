@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
@@ -64,14 +65,35 @@ fun MyCoursesScreen(
                         modifier = Modifier.fillMaxSize().padding(paddingValues),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("You haven't created any courses yet", color = AppColors.textSecondary)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.School,
+                                contentDescription = null,
+                                tint = AppColors.textSecondary.copy(alpha = 0.4f),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "No courses yet",
+                                color = AppColors.textPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Create your first course to get started",
+                                color = AppColors.textSecondary,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier
                             .padding(paddingValues)
                             .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
                         items(courses) { course ->
                             MyGeneratedCourseCard(
@@ -96,7 +118,16 @@ fun MyCoursesScreen(
                     modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Error: ${state.message}", color = AppColors.textSecondary)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text("Failed to load courses", color = AppColors.textSecondary)
+                    }
                 }
             }
         }
@@ -104,7 +135,7 @@ fun MyCoursesScreen(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  MY GENERATED COURSE CARD – WITH 3‑DOT MENU & DELETE
+//  MY GENERATED COURSE CARD – POLISHED UI
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun MyGeneratedCourseCard(
@@ -120,71 +151,167 @@ fun MyGeneratedCourseCard(
         colors = CardDefaults.cardColors(containerColor = AppColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = course.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = AppColors.textPrimary
-                )
-                Spacer(Modifier.height(4.dp))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                // Course icon
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AppColors.primary.copy(alpha = 0.1f),
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.MenuBook,
+                            contentDescription = null,
+                            tint = AppColors.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
-                Text(
-                    text = "Course ID: ${course.id}",
-                    fontSize = 14.sp,
-                    color = AppColors.textSecondary
-                )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.width(12.dp))
 
-                Text(
-                    text = "Title: ${course.title ?: "No title"}",
-                    fontSize = 14.sp,
-                    color = AppColors.textSecondary
-                )
-                Spacer(Modifier.height(4.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = course.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = AppColors.textPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-                Text(
-                    text = "Description: ${course.description ?: "No description"}",
-                    fontSize = 14.sp,
-                    color = AppColors.textSecondary
-                )
-                Spacer(Modifier.height(4.dp))
+                    if (!course.description.isNullOrBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = course.description,
+                            fontSize = 13.sp,
+                            color = AppColors.textSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
 
-                Text(
-                    text = "Difficulty Level: ${course.difficulty ?: "Not specified"}",
-                    fontSize = 14.sp,
-                    color = AppColors.textSecondary
-                )
-                Spacer(Modifier.height(4.dp))
-
-                Text(
-                    text = "Created: ${course.createdAt ?: "N/A"}",
-                    fontSize = 14.sp,
-                    color = AppColors.textSecondary
-                )
+                // 3-dot menu
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "More options",
+                            tint = AppColors.textSecondary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Delete Course", color = Color(0xFFEF4444)) },
+                            onClick = {
+                                expanded = false
+                                onDelete()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                            }
+                        )
+                    }
+                }
             }
 
-            // 3‑DOT MENU
-            var expanded by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { expanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Delete Course") },
-                        onClick = {
-                            expanded = false
-                            onDelete()
+            // Bottom row with badges
+            Spacer(Modifier.height(12.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Difficulty badge
+                course.difficulty?.let { diff ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = when (diff.lowercase()) {
+                            "beginner" -> Color(0xFF10B981).copy(alpha = 0.1f)
+                            "intermediate" -> Color(0xFFF59E0B).copy(alpha = 0.1f)
+                            "advanced" -> Color(0xFFEF4444).copy(alpha = 0.1f)
+                            else -> AppColors.primary.copy(alpha = 0.1f)
                         }
-                    )
+                    ) {
+                        Text(
+                            diff.replaceFirstChar { it.uppercase() },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            color = when (diff.lowercase()) {
+                                "beginner" -> Color(0xFF10B981)
+                                "intermediate" -> Color(0xFFF59E0B)
+                                "advanced" -> Color(0xFFEF4444)
+                                else -> AppColors.primary
+                            },
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Status badge
+                course.status?.let { status ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = when (status.lowercase()) {
+                            "completed", "content_generated" -> AppColors.progressGreen.copy(alpha = 0.1f)
+                            "generating", "generating_content" -> Color(0xFFF59E0B).copy(alpha = 0.1f)
+                            else -> AppColors.primary.copy(alpha = 0.1f)
+                        }
+                    ) {
+                        Text(
+                            when (status.lowercase()) {
+                                "content_generated" -> "Ready"
+                                "generating_content" -> "Generating..."
+                                "outline_generated" -> "Outline Ready"
+                                else -> status.replace("_", " ").replaceFirstChar { it.uppercase() }
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            color = when (status.lowercase()) {
+                                "completed", "content_generated" -> AppColors.progressGreen
+                                "generating", "generating_content" -> Color(0xFFF59E0B)
+                                else -> AppColors.primary
+                            },
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Public/Private badge
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (course.isPublic) AppColors.primary.copy(alpha = 0.1f) else AppColors.textSecondary.copy(alpha = 0.1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            if (course.isPublic) Icons.Default.Public else Icons.Default.Lock,
+                            null,
+                            modifier = Modifier.size(12.dp),
+                            tint = if (course.isPublic) AppColors.primary else AppColors.textSecondary
+                        )
+                        Text(
+                            if (course.isPublic) "Public" else "Private",
+                            fontSize = 11.sp,
+                            color = if (course.isPublic) AppColors.primary else AppColors.textSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

@@ -39,13 +39,14 @@ import com.example.jetpackdemo.ui.theme.AppColors
 import com.example.jetpackdemo.viewmodels.AdminViewModel
 import com.example.jetpackdemo.viewmodels.CourseViewModel
 import com.example.jetpackdemo.viewmodels.Resource
+import com.example.jetpackdemo.viewmodels.UserViewModel
 
 // --- Data Models ---
 data class BottomNavItem(val title: String, val route: String, val icon: ImageVector)
 
 // --- Main Screen with Bottom Navigation ---
 @Composable
-fun MainScreen(navController: NavHostController, courseViewModel: CourseViewModel, adminViewModel: AdminViewModel? = null) {
+fun MainScreen(navController: NavHostController, courseViewModel: CourseViewModel, adminViewModel: AdminViewModel? = null, userViewModel: UserViewModel? = null) {
     val bottomBarNavController = rememberNavController()
     Scaffold(
         bottomBar = { HomeBottomNavigation(navController = bottomBarNavController) }
@@ -55,7 +56,8 @@ fun MainScreen(navController: NavHostController, courseViewModel: CourseViewMode
                 bottomBarNavController = bottomBarNavController,
                 appNavController = navController,
                 courseViewModel = courseViewModel,
-                adminViewModel = adminViewModel
+                adminViewModel = adminViewModel,
+                userViewModel = userViewModel
             )
         }
     }
@@ -67,7 +69,8 @@ fun BottomNavGraph(
     bottomBarNavController: NavHostController,
     appNavController: NavHostController,
     courseViewModel: CourseViewModel,
-    adminViewModel: AdminViewModel? = null
+    adminViewModel: AdminViewModel? = null,
+    userViewModel: UserViewModel? = null
 ) {
     NavHost(navController = bottomBarNavController, startDestination = "home") {
         composable("home") {
@@ -83,7 +86,7 @@ fun BottomNavGraph(
             MyCoursesScreen(
                 viewModel = courseViewModel,
                 onCourseClick = { courseId ->
-                    bottomBarNavController.navigate("course_content/$courseId")
+                    bottomBarNavController.navigate("course_preview/$courseId")
                 }
             )
         }
@@ -93,7 +96,7 @@ fun BottomNavGraph(
             EnrolledCoursesScreen(
                 viewModel = courseViewModel,
                 onCourseClick = { courseId ->
-                    bottomBarNavController.navigate("course_content/$courseId")
+                    bottomBarNavController.navigate("course_preview/$courseId")
                 }
             )
         }
@@ -104,7 +107,13 @@ fun BottomNavGraph(
                 onJoinCourse = { courseId ->
                     courseViewModel.enrollInCourse(courseId)
                 },
-                onNavigateBack = { bottomBarNavController.popBackStack() }
+                onNavigateBack = { bottomBarNavController.popBackStack() },
+                onCoursePreviewClicked = { courseId ->
+                    bottomBarNavController.navigate("course_preview/$courseId")
+                },
+                onCreatorClick = { creatorId ->
+                    bottomBarNavController.navigate("creator_profile/$creatorId")
+                }
             )
         }
 
@@ -123,9 +132,11 @@ fun BottomNavGraph(
         }
         composable("profile") {
             UserProfileScreen(
-                navController = appNavController,
+                navController = bottomBarNavController,
+                appNavController = appNavController,
                 courseViewModel = courseViewModel,
-                adminViewModel = adminViewModel
+                adminViewModel = adminViewModel,
+                userViewModel = userViewModel
             )
         }
 
@@ -137,13 +148,61 @@ fun BottomNavGraph(
                 navController = bottomBarNavController,
                 courseViewModel = courseViewModel,
                 onEnroll = { courseViewModel.enrollInCourse(courseId) },
-                onStartInteractiveLearning = { firstSubtopicId, allSubtopicIds ->
-                    // Navigate to interactive learning with first subtopic
-                    // Pass all IDs via saved state or ViewModel for sequential navigation
+                onStartInteractiveLearning = { _, allSubtopicIds ->
+                    // Resume via course route so backend returns next unfinished subtopic
                     courseViewModel.setInteractiveSubtopics(allSubtopicIds)
-                    appNavController.navigate("interactive/$firstSubtopicId")
+                    appNavController.navigate("interactive_course/$courseId")
                 }
             )
+        }
+
+        // Creator Profile Screen
+        composable("creator_profile/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+            if (userViewModel != null) {
+                CreatorProfileScreen(
+                    userId = userId,
+                    userViewModel = userViewModel,
+                    onNavigateBack = { bottomBarNavController.popBackStack() },
+                    onCourseClick = { courseId ->
+                        bottomBarNavController.navigate("course_preview/$courseId")
+                    },
+                    onFollowersClick = { uid ->
+                        bottomBarNavController.navigate("followers_list/$uid")
+                    },
+                    onFollowingClick = { uid ->
+                        bottomBarNavController.navigate("following_list/$uid")
+                    }
+                )
+            }
+        }
+
+        // Followers List
+        composable("followers_list/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+            if (userViewModel != null) {
+                FollowListScreen(
+                    userId = userId,
+                    isFollowers = true,
+                    userViewModel = userViewModel,
+                    onNavigateBack = { bottomBarNavController.popBackStack() },
+                    onUserClick = { uid -> bottomBarNavController.navigate("creator_profile/$uid") }
+                )
+            }
+        }
+
+        // Following List
+        composable("following_list/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+            if (userViewModel != null) {
+                FollowListScreen(
+                    userId = userId,
+                    isFollowers = false,
+                    userViewModel = userViewModel,
+                    onNavigateBack = { bottomBarNavController.popBackStack() },
+                    onUserClick = { uid -> bottomBarNavController.navigate("creator_profile/$uid") }
+                )
+            }
         }
     }
 }
@@ -161,6 +220,10 @@ fun HomeScreen(
 
     val context = LocalContext.current
     val enrollResult by courseViewModel.enrollResult.observeAsState(Resource.Loading())
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
+    val searchResults by courseViewModel.fullSearchResults.collectAsStateWithLifecycle()
+
     LaunchedEffect(enrollResult) {
         when (enrollResult) {
             is Resource.Success -> {
@@ -175,26 +238,26 @@ fun HomeScreen(
         }
     }
 
-
-
     LaunchedEffect(Unit) { courseViewModel.getAllPublicCourses() }
 
     Scaffold(
         containerColor = AppColors.background,
         topBar = { HomeTopBar(courseViewModel) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCreateCourseClicked,
-                containerColor = AppColors.primary,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (!isSearchActive) {
+                FloatingActionButton(
+                    onClick = onCreateCourseClicked,
+                    containerColor = AppColors.primary,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Course", tint = AppColors.onPrimary)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Create Course", color = AppColors.onPrimary)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Create Course", tint = AppColors.onPrimary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Create Course", color = AppColors.onPrimary)
+                    }
                 }
             }
         },
@@ -208,41 +271,168 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { Spacer(Modifier.height(8.dp)) }
+            item { Spacer(Modifier.height(4.dp)) }
 
-            // === INTERACTIVE LEARNING DEMO BUTTON ===
+            // === SEARCH BAR ===
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2D6A4F)),
-                    onClick = onInteractiveDemoClicked
-                ) {
-                    Row(
-                        modifier = Modifier.padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.width(16.dp))
-                        Column {
-                            Text("Try Interactive Learning", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
-                            Text("Experience the new quiz-based mode", fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { query ->
+                        searchQuery = query
+                        isSearchActive = query.isNotBlank()
+                        if (query.length >= 2) {
+                            courseViewModel.searchCoursesFull(query, null, null)
                         }
-                    }
-                }
-            }
-            
-            item { Spacer(Modifier.height(8.dp)) }
-
-            item {
-                DiscoverCoursesSection(
-                    courseViewModel = courseViewModel,
-                    onSeeAllClicked = onSeeAllPublic,
-                    onCourseClicked = onCoursePreviewClicked
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search courses...", color = AppColors.textSecondary) },
+                    leadingIcon = { Icon(Icons.Default.Search, "Search", tint = AppColors.textSecondary) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                isSearchActive = false
+                            }) {
+                                Icon(Icons.Default.Close, "Clear", tint = AppColors.textSecondary)
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppColors.primary,
+                        unfocusedBorderColor = AppColors.textSecondary.copy(alpha = 0.2f),
+                        focusedContainerColor = AppColors.surface,
+                        unfocusedContainerColor = AppColors.surface,
+                        cursorColor = AppColors.primary
+                    ),
+                    singleLine = true
                 )
             }
 
-            item { Spacer(Modifier.height(80.dp)) }
+            if (isSearchActive && searchQuery.length >= 2) {
+                // === SEARCH RESULTS ===
+                if (searchResults.isEmpty()) {
+                    item {
+                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.SearchOff, null, tint = AppColors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text("No courses found for \"$searchQuery\"", color = AppColors.textSecondary, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                } else {
+                    items(searchResults) { result ->
+                        SearchResultCard(
+                            result = result,
+                            onClick = { onCoursePreviewClicked(result.id) }
+                        )
+                    }
+                }
+            } else {
+                // === INTERACTIVE LEARNING DEMO BUTTON ===
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D6A4F)),
+                        onClick = onInteractiveDemoClicked
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text("Try Interactive Learning", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+                                Text("Experience the new quiz-based mode", fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    DiscoverCoursesSection(
+                        courseViewModel = courseViewModel,
+                        onSeeAllClicked = onSeeAllPublic,
+                        onCourseClicked = onCoursePreviewClicked
+                    )
+                }
+
+                item { Spacer(Modifier.height(80.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+fun SearchResultCard(
+    result: com.example.jetpackdemo.data.model.FullSearchItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = AppColors.primary.copy(alpha = 0.1f),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.School, null, tint = AppColors.primary, modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    result.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = AppColors.textPrimary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    result.creator_name?.let { name ->
+                        Text("by $name", fontSize = 12.sp, color = AppColors.textSecondary)
+                    }
+                    result.difficulty?.let { diff ->
+                        Text(
+                            "• ${diff.replaceFirstChar { it.uppercase() }}",
+                            fontSize = 12.sp,
+                            color = when (diff.lowercase()) {
+                                "beginner" -> Color(0xFF10B981)
+                                "intermediate" -> Color(0xFFF59E0B)
+                                "advanced" -> Color(0xFFEF4444)
+                                else -> AppColors.textSecondary
+                            },
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    if (result.total_users_joined > 0) {
+                        Text(
+                            "• ${result.total_users_joined} enrolled",
+                            fontSize = 12.sp,
+                            color = AppColors.textSecondary
+                        )
+                    }
+                }
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = AppColors.textSecondary.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -254,6 +444,11 @@ fun DiscoverCoursesSection(
     onCourseClicked: (String) -> Unit
 ) {
     val publicCoursesState by courseViewModel.publicCourses.observeAsState(Resource.Loading<CoursesResponse>())
+    val currentUserId = courseViewModel.currentUserId
+    val enrollResult by courseViewModel.enrollResult.observeAsState(Resource.Loading())
+    val isEnrolling = enrollResult is Resource.Loading && enrollResult.data == null &&
+            enrollResult.message == null // initial state is also Loading, so track separately
+    var enrollingCourseId by remember { mutableStateOf<String?>(null) }
 
     Column {
         SectionHeader(title = "Discover Courses", onSeeAll = onSeeAllClicked)
@@ -265,7 +460,9 @@ fun DiscoverCoursesSection(
                 }
             }
             is Resource.Success -> {
-                val courses = publicCoursesState.data?.courses?.take(5) ?: emptyList()
+                val courses = publicCoursesState.data?.courses
+                    ?.filter { it.createdBy != currentUserId }
+                    ?.take(5) ?: emptyList()
                 if (courses.isEmpty()) {
                     Box(modifier = Modifier.height(150.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text("No courses available yet", color = AppColors.textSecondary)
@@ -279,7 +476,11 @@ fun DiscoverCoursesSection(
                             com.example.jetpackdemo.ui.components.PremiumCourseCard(
                                 course = course,
                                 onCardClick = { onCourseClicked(course.id) },
-                                onJoinClick = { courseViewModel.enrollInCourse(course.id) }
+                                onJoinClick = {
+                                    enrollingCourseId = course.id
+                                    courseViewModel.enrollInCourse(course.id)
+                                },
+                                isEnrolling = enrollingCourseId == course.id && enrollResult is Resource.Loading
                             )
                         }
                     }
@@ -289,43 +490,6 @@ fun DiscoverCoursesSection(
                 Box(modifier = Modifier.height(100.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text("Error loading courses", color = Color.Red)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun DiscoverCourseCard(
-    course: Course,
-    onJoin: () -> Unit  // ← NEW
-) {
-    Card(
-        modifier = Modifier.width(280.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = AppColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(course.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AppColors.textPrimary)
-            Spacer(Modifier.height(4.dp))
-            Text("ID: ${course.id}", fontSize = 14.sp, color = AppColors.textSecondary)
-            Spacer(Modifier.height(4.dp))
-            course.description?.let {
-                Text(it, fontSize = 14.sp, color = AppColors.textSecondary, maxLines = 2)
-                Spacer(Modifier.height(4.dp))
-            }
-            course.difficulty?.let {
-                Text("Level: $it", fontSize = 14.sp, color = AppColors.textSecondary)
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // CONNECT TO onJoin
-            OutlinedButton(
-                onClick = onJoin,  // ← NOW CALLS enroll
-                modifier = Modifier.align(Alignment.End),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Join")
             }
         }
     }

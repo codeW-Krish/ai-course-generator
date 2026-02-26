@@ -1,6 +1,14 @@
 package com.example.jetpackdemo.data.model
 
+import com.google.gson.JsonArray
+import com.google.gson.JsonDeserializationContext
+import com.google.gson.JsonDeserializer
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.google.gson.annotations.JsonAdapter
 import com.google.gson.annotations.SerializedName
+import java.lang.reflect.Type
 
 // --- Request Body for Outline Generation ---
 data class GenerateOutlineRequest(
@@ -55,13 +63,22 @@ data class Course(
     val description: String?,
     val difficulty: String?,
     @SerializedName("created_by")
-    val createdBy: String,
+    val createdBy: String? = null,
     @SerializedName("include_videos")
-    val includeVideos: Boolean,
+    val includeVideos: Boolean = false,
     @SerializedName("outline_json")
-    val outlineJson: Any?, // can map to CourseOutline if always same shape
+    val outlineJson: Any? = null,
     @SerializedName("created_at")
-    val createdAt: String
+    val createdAt: Any? = null,
+    @SerializedName("outline_generated_at")
+    val outlineGeneratedAt: Any? = null,
+    val status: String? = null,
+    @SerializedName("is_public")
+    val isPublic: Boolean = true,
+    @SerializedName("creator_name")
+    val creatorName: String? = null,
+    @SerializedName("total_users_joined")
+    val totalUsersJoined: Int = 0
 )
 
 data class EnrollCourseRequest(
@@ -92,10 +109,12 @@ data class Subtopic(
     @SerializedName("unit_id")
     val unitId: String,
     val title: String,
-    val content: String?,
+    @JsonAdapter(GeneratedSubtopicContentJsonAdapter::class)
+    val content: GeneratedSubtopicContent? = null,
     val position: Int,
-    val contentGeneratedAt: String?,
-    val videos: List<Video> = emptyList() // Add this field
+    @SerializedName("content_generated_at")
+    val contentGeneratedAt: Any? = null,
+    val videos: List<Video> = emptyList()
 )
 
 // Add Video data class
@@ -141,6 +160,137 @@ data class Example(
     val type: String, // "analogy" or "technical_example"
     val content: String
 )
+
+class GeneratedSubtopicContentJsonAdapter : JsonDeserializer<GeneratedSubtopicContent?> {
+    override fun deserialize(
+        json: JsonElement?,
+        typeOfT: Type?,
+        context: JsonDeserializationContext?
+    ): GeneratedSubtopicContent? {
+        if (json == null || json.isJsonNull) return null
+
+        return try {
+            when {
+                json.isJsonObject -> parseObject(json.asJsonObject)
+                json.isJsonArray -> parseArray(json.asJsonArray)
+                json.isJsonPrimitive -> parsePrimitive(json.asString)
+                else -> fallbackFromRaw(json.toString())
+            }
+        } catch (_: Exception) {
+            fallbackFromRaw(json.toString())
+        }
+    }
+
+    private fun parseArray(array: JsonArray): GeneratedSubtopicContent? {
+        if (array.size() == 0) return null
+        val first = array.firstOrNull { !it.isJsonNull } ?: return null
+        return deserialize(first, null, null)
+    }
+
+    private fun parsePrimitive(raw: String): GeneratedSubtopicContent {
+        val trimmed = raw.trim()
+        val unwrapped = trimmed
+            .removePrefix("\"")
+            .removeSuffix("\"")
+            .replace("\\\"", "\"")
+            .replace("\\n", "\n")
+            .replace("\\t", "\t")
+
+        if ((unwrapped.startsWith("{") && unwrapped.endsWith("}")) ||
+            (unwrapped.startsWith("[") && unwrapped.endsWith("]"))
+        ) {
+            return deserialize(JsonParser.parseString(unwrapped), null, null)
+                ?: fallbackFromRaw(unwrapped)
+        }
+        return fallbackFromRaw(raw)
+    }
+
+    private fun parseObject(obj: JsonObject): GeneratedSubtopicContent {
+        val nestedContent = obj.getString("content")?.trim()
+        if (!nestedContent.isNullOrBlank()) {
+            val parsedNested = runCatching { parsePrimitive(nestedContent) }.getOrNull()
+            if (parsedNested != null &&
+                (parsedNested.coreConcepts.isNotEmpty() ||
+                        parsedNested.examples.isNotEmpty() ||
+                        parsedNested.whyThisMatters.isNotBlank())
+            ) {
+                return parsedNested
+            }
+        }
+
+        val subtopicTitle =
+            obj.getString("subtopic_title")
+                ?: obj.getString("subtopicTitle")
+                ?: obj.getString("title")
+                ?: ""
+
+        val title =
+            obj.getString("title")
+                ?: obj.getString("subtopic_title")
+                ?: "Learning Content"
+
+        val whyThisMatters =
+            obj.getString("why_this_matters")
+                ?: obj.getString("whyThisMatters")
+                ?: obj.getString("content")
+                ?: ""
+
+        val coreConcepts = obj.getAsJsonArray("core_concepts")
+            ?.mapNotNull { element ->
+                val item = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+                val concept = item.getString("concept") ?: return@mapNotNull null
+                val explanation = item.getString("explanation") ?: ""
+                CoreConcept(concept = concept, explanation = explanation)
+            }
+            ?: emptyList()
+
+        val examples = obj.getAsJsonArray("examples")
+            ?.mapNotNull { element ->
+                val item = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+                val type = item.getString("type") ?: "example"
+                val content = item.getString("content") ?: ""
+                Example(type = type, content = content)
+            }
+            ?: emptyList()
+
+        val codeOrMath =
+            obj.getString("code_or_math")
+                ?: obj.getString("codeOrMath")
+
+        val youtubeKeywords = obj.getAsJsonArray("youtube_keywords")
+            ?.mapNotNull { it.takeIf { value -> value.isJsonPrimitive }?.asString }
+            ?: emptyList()
+
+        return GeneratedSubtopicContent(
+            subtopicTitle = subtopicTitle,
+            title = title,
+            whyThisMatters = whyThisMatters,
+            coreConcepts = coreConcepts,
+            examples = examples,
+            codeOrMath = codeOrMath,
+            youtubeKeywords = youtubeKeywords
+        )
+    }
+
+    private fun fallbackFromRaw(raw: String): GeneratedSubtopicContent {
+        val normalized = raw.trim().removePrefix("\"").removeSuffix("\"")
+        return GeneratedSubtopicContent(
+            subtopicTitle = "",
+            title = "Learning Content",
+            whyThisMatters = normalized,
+            coreConcepts = emptyList(),
+            examples = emptyList(),
+            codeOrMath = null,
+            youtubeKeywords = emptyList()
+        )
+    }
+
+    private fun JsonObject.getString(key: String): String? {
+        val value = get(key) ?: return null
+        if (value.isJsonNull) return null
+        return runCatching { value.asString }.getOrNull()
+    }
+}
 
 // --- Subtopic Batch Response (array of GeneratedSubtopicContent) ---
 typealias SubtopicBatchResponse = List<GeneratedSubtopicContent>

@@ -104,7 +104,7 @@ fun AdminCourseCard(
                 color = AppColors.textPrimary
             )
             Text(
-                text = "By: ${course.createdBy}",
+                text = "By: ${course.createdBy ?: "Unknown"}",
                 fontSize = 14.sp,
                 color = AppColors.textSecondary
             )

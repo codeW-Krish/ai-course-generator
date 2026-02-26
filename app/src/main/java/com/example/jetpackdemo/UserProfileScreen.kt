@@ -2,32 +2,45 @@ package com.example.jetpackdemo
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.jetpackdemo.data.model.DefaultProvidersResponse
+import com.example.jetpackdemo.data.model.UpdateProfileRequest
 import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.example.jetpackdemo.ui.theme.AppColors
 import com.example.jetpackdemo.utils.TokenManager
 import com.example.jetpackdemo.viewmodels.CourseViewModel
 import com.example.jetpackdemo.viewmodels.AdminViewModel
+import com.example.jetpackdemo.viewmodels.Resource
+import com.example.jetpackdemo.viewmodels.UserViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserProfileScreen(
     navController: NavHostController,
+    appNavController: NavHostController,
     courseViewModel: CourseViewModel,
-    adminViewModel: AdminViewModel? = null
+    adminViewModel: AdminViewModel? = null,
+    userViewModel: UserViewModel? = null
 ) {
     val context = LocalContext.current
     val userPrefsManager = remember { UserPreferencesManager(context) }
@@ -40,12 +53,23 @@ fun UserProfileScreen(
     val outlineProvider by courseViewModel.selectedOutlineProvider.collectAsState()
     val contentProvider by courseViewModel.selectedContentProvider.collectAsState()
 
+    // === User Profile State ===
+    val myProfile = userViewModel?.myProfile?.collectAsStateWithLifecycle()
+    val profileData = myProfile?.value
+
     // === Local UI State ===
     var showSuccessToast by remember { mutableStateOf(false) }
+    var showEditBioDialog by remember { mutableStateOf(false) }
+    var showEditProfilePicDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     // === Use only real providers (no fallback) ===
     val providers = availableProviders
+
+    // Load profile on mount
+    LaunchedEffect(Unit) {
+        userViewModel?.loadMyProfile()
+    }
 
     Scaffold(
         containerColor = AppColors.background,
@@ -71,8 +95,24 @@ fun UserProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
-                ProfileHeader()
-                Spacer(modifier = Modifier.height(32.dp))
+
+                // === PROFILE HEADER with picture, stats ===
+                ProfileHeaderEnhanced(
+                    profileData = profileData,
+                    userPrefsManager = userPrefsManager,
+                    onEditPicture = { showEditProfilePicDialog = true },
+                    onEditBio = { showEditBioDialog = true },
+                    onFollowersClick = {
+                        val userId = (profileData as? Resource.Success)?.data?.id
+                        if (userId != null) navController.navigate("followers_list/$userId")
+                    },
+                    onFollowingClick = {
+                        val userId = (profileData as? Resource.Success)?.data?.id
+                        if (userId != null) navController.navigate("following_list/$userId")
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // === ADMIN SECTION ===
                 if (userRole == "admin" && adminViewModel != null) {
@@ -107,17 +147,9 @@ fun UserProfileScreen(
                         userPrefsManager.clearAll()
                         courseViewModel.clearUserData()
                         tokenManager.clearTokens()
-                        navController.navigate("login") {
+                        appNavController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
-//                        navController.navigate("login") {
-//                            popUpTo("main") { inclusive = false }
-//                            launchSingleTop = true
-//                        }
-//                        navController.navigate("login") {
-//                            popUpTo(navController.graph.startDestinationId) { inclusive = false }
-//                            launchSingleTop = true
-//                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
@@ -146,6 +178,224 @@ fun UserProfileScreen(
                 }
             }
         }
+    }
+
+    // === Edit Bio Dialog ===
+    if (showEditBioDialog && userViewModel != null) {
+        var bioText by remember {
+            mutableStateOf((profileData as? Resource.Success)?.data?.bio ?: "")
+        }
+        AlertDialog(
+            onDismissRequest = { showEditBioDialog = false },
+            title = { Text("Edit Bio") },
+            text = {
+                OutlinedTextField(
+                    value = bioText,
+                    onValueChange = { bioText = it },
+                    label = { Text("Your bio") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    userViewModel.updateMyProfile(UpdateProfileRequest(bio = bioText))
+                    showEditBioDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditBioDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // === Edit Profile Picture Dialog ===
+    if (showEditProfilePicDialog && userViewModel != null) {
+        var imageUrl by remember {
+            mutableStateOf((profileData as? Resource.Success)?.data?.profileImageUrl ?: "")
+        }
+        AlertDialog(
+            onDismissRequest = { showEditProfilePicDialog = false },
+            title = { Text("Profile Picture") },
+            text = {
+                Column {
+                    Text("Enter an image URL for your profile picture:", fontSize = 14.sp, color = AppColors.textSecondary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = imageUrl,
+                        onValueChange = { imageUrl = it },
+                        label = { Text("Image URL") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    if (imageUrl.isNotBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("Preview:", fontSize = 13.sp, color = AppColors.textSecondary)
+                        Spacer(Modifier.height(8.dp))
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Preview",
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .align(Alignment.CenterHorizontally),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    userViewModel.updateMyProfile(UpdateProfileRequest(profileImageUrl = imageUrl))
+                    showEditProfilePicDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfilePicDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+// === ENHANCED PROFILE HEADER ===
+@Composable
+fun ProfileHeaderEnhanced(
+    profileData: Resource<com.example.jetpackdemo.data.model.UserProfile>?,
+    userPrefsManager: UserPreferencesManager,
+    onEditPicture: () -> Unit,
+    onEditBio: () -> Unit,
+    onFollowersClick: () -> Unit,
+    onFollowingClick: () -> Unit
+) {
+    val username = remember { userPrefsManager.getUsername() ?: "User" }
+    val email = remember { userPrefsManager.getEmail() ?: "user@example.com" }
+
+    val profile = (profileData as? Resource.Success)?.data
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Profile Picture with edit overlay
+        Box(contentAlignment = Alignment.BottomEnd) {
+            if (profile?.profileImageUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(profile.profileImageUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Profile picture",
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onEditPicture),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(AppColors.primary.copy(alpha = 0.15f))
+                        .clickable(onClick = onEditPicture),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        username.first().uppercase(),
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.primary
+                    )
+                }
+            }
+            // Edit icon
+            Surface(
+                shape = CircleShape,
+                color = AppColors.primary,
+                modifier = Modifier
+                    .size(28.dp)
+                    .clickable(onClick = onEditPicture)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Edit, null, tint = AppColors.onPrimary, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(profile?.username ?: username, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
+        Text(profile?.email ?: email, fontSize = 14.sp, color = AppColors.textSecondary)
+
+        // Bio
+        if (profile?.bio != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                profile.bio,
+                fontSize = 14.sp,
+                color = AppColors.textSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+        }
+        TextButton(onClick = onEditBio) {
+            Text(
+                if (profile?.bio.isNullOrBlank()) "Add a bio" else "Edit bio",
+                fontSize = 13.sp,
+                color = AppColors.accent
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Social stats row
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(
+                    count = profile?.coursesCount ?: 0,
+                    label = "Courses",
+                    onClick = {}
+                )
+                Box(Modifier.width(1.dp).height(40.dp).background(AppColors.textSecondary.copy(alpha = 0.2f)))
+                StatItem(
+                    count = profile?.followersCount ?: 0,
+                    label = "Learners",
+                    onClick = onFollowersClick
+                )
+                Box(Modifier.width(1.dp).height(40.dp).background(AppColors.textSecondary.copy(alpha = 0.2f)))
+                StatItem(
+                    count = profile?.followingCount ?: 0,
+                    label = "Mentors",
+                    onClick = onFollowingClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StatItem(count: Int, label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            "$count",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = AppColors.textPrimary
+        )
+        Text(label, fontSize = 13.sp, color = AppColors.textSecondary)
     }
 }
 
@@ -293,26 +543,6 @@ fun ProviderSelectionSection(
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
             ) { Text("Save Settings", color = AppColors.onPrimary) }
         }
-    }
-}
-
-// === PROFILE HEADER ===
-@Composable
-fun ProfileHeader() {
-    val context = LocalContext.current
-    val userPrefsManager = remember { UserPreferencesManager(context) }
-    // Read saved username and email directly from SharedPreferences
-    val username = remember { userPrefsManager.getUsername() ?: "User" }
-    val email = remember { userPrefsManager.getEmail() ?: "user@example.com" }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .background(Color.Gray, shape = RoundedCornerShape(50))
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(username, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
-        Text(email, fontSize = 14.sp, color = AppColors.textSecondary)
     }
 }
 

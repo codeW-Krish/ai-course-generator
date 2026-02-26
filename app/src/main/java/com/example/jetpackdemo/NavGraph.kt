@@ -17,6 +17,7 @@ import com.example.jetpackdemo.data.repository.AudioRepository
 import com.example.jetpackdemo.data.repository.CourseRepository
 import com.example.jetpackdemo.data.repository.FlashcardRepository
 import com.example.jetpackdemo.data.repository.NotesRepository
+import com.example.jetpackdemo.data.repository.UserRepository
 import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.example.jetpackdemo.utils.TokenManager
 import com.example.jetpackdemo.viewmodels.AdminViewModel
@@ -30,6 +31,8 @@ import com.example.jetpackdemo.viewmodels.FlashcardViewModelFactory
 import com.example.jetpackdemo.viewmodels.InteractiveViewModelFactory
 import com.example.jetpackdemo.viewmodels.NotesViewModel
 import com.example.jetpackdemo.viewmodels.NotesViewModelFactory
+import com.example.jetpackdemo.viewmodels.UserViewModel
+import com.example.jetpackdemo.viewmodels.UserViewModelFactory
 
 
 
@@ -65,6 +68,11 @@ fun AppNavGraph(navController: NavHostController) {
     val factory = CourseViewModelFactory(repository, context as Application)
     val courseViewModel: CourseViewModel = viewModel(factory = factory)
 
+    // User repository & ViewModel
+    val userRepository = UserRepository(api)
+    val userFactory = UserViewModelFactory(userRepository, context as Application)
+    val userViewModel: UserViewModel = viewModel(factory = userFactory)
+
     NavHost(navController = navController, startDestination = startDestination) {
         // === AUTH FLOW ===
         composable("welcome") {
@@ -92,7 +100,8 @@ fun AppNavGraph(navController: NavHostController) {
                 adminViewModel = if (userRole == "admin") {
                     val adminFactory = AdminViewModelFactory(repository, context as Application)
                     viewModel(factory = adminFactory)
-                } else null
+                } else null,
+                userViewModel = userViewModel
             )
         }
 

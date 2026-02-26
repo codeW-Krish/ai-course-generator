@@ -37,6 +37,22 @@ import com.example.jetpackdemo.data.model.GetGeneratedNotesResponse
 import com.example.jetpackdemo.data.model.ExportSubtopicNotesResponse
 import com.example.jetpackdemo.data.model.ExportCourseNotesResponse
 import com.example.jetpackdemo.data.model.GetAudioResponse
+import com.example.jetpackdemo.data.model.CourseChatRequest
+import com.example.jetpackdemo.data.model.CourseChatResponse
+import com.example.jetpackdemo.data.model.CoursePracticeRequest
+import com.example.jetpackdemo.data.model.CoursePracticeResponse
+import com.example.jetpackdemo.data.model.ContentResponse
+import com.example.jetpackdemo.data.model.QuizResponse
+import com.example.jetpackdemo.data.model.SubmitQuizRequest
+import com.example.jetpackdemo.data.model.SubmitQuizResponse
+import com.example.jetpackdemo.data.model.HubActivityRequest
+import com.example.jetpackdemo.data.model.HubActivity
+import com.example.jetpackdemo.data.model.HubHistoryResponse
+import com.example.jetpackdemo.data.model.UserProfile
+import com.example.jetpackdemo.data.model.UpdateProfileRequest
+import com.example.jetpackdemo.data.model.FollowResponse
+import com.example.jetpackdemo.data.model.FollowersResponse
+import com.example.jetpackdemo.data.model.FollowingResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -205,6 +221,57 @@ interface ApiService {
         @Body request: InteractiveChatRequest
     ): Response<InteractiveChatResponse>
 
+    // === CONTENT-FIRST INTERACTIVE FLOW ===
+
+    /** Get content only for next uncompleted subtopic (triggers background quiz gen) */
+    @GET("/api/interactive/course/{courseId}/next-content")
+    suspend fun getNextContent(
+        @Path("courseId") courseId: String,
+        @Query("provider") provider: String = "Groq"
+    ): Response<ContentResponse>
+
+    /** Get quiz questions with correct answers for client-side checking */
+    @GET("/api/interactive/{subtopicId}/quiz")
+    suspend fun getQuiz(
+        @Path("subtopicId") subtopicId: String,
+        @Query("provider") provider: String = "Groq"
+    ): Response<QuizResponse>
+
+    /** Submit all quiz results at once */
+    @POST("/api/interactive/{subtopicId}/submit-quiz")
+    suspend fun submitQuiz(
+        @Path("subtopicId") subtopicId: String,
+        @Body request: SubmitQuizRequest
+    ): Response<SubmitQuizResponse>
+
+    // === HUB ACTIVITY ===
+
+    /** Log a hub feature access */
+    @POST("/api/interactive/hub/log")
+    suspend fun logHubActivity(
+        @Body request: HubActivityRequest
+    ): Response<HubActivity>
+
+    /** Get hub activity history for a course */
+    @GET("/api/interactive/hub/history/{courseId}")
+    suspend fun getHubHistory(
+        @Path("courseId") courseId: String,
+        @Query("limit") limit: Int = 50
+    ): Response<HubHistoryResponse>
+
+    // === COURSE-LEVEL INTERACTIVE ===
+    @POST("/api/interactive/course/{courseId}/chat")
+    suspend fun chatWithCourseAI(
+        @Path("courseId") courseId: String,
+        @Body request: CourseChatRequest
+    ): Response<CourseChatResponse>
+
+    @POST("/api/interactive/course/{courseId}/practice")
+    suspend fun generateCoursePractice(
+        @Path("courseId") courseId: String,
+        @Body request: CoursePracticeRequest
+    ): Response<CoursePracticeResponse>
+
     // === AUTH: LOGOUT ===
     @POST("/api/auth/logout")
     suspend fun logout(): Response<GenericResponse>
@@ -270,6 +337,40 @@ interface ApiService {
         @Query("llm_provider") llmProvider: String? = null,
         @Query("llm_model") llmModel: String? = null
     ): Response<GetAudioResponse>
+
+    // === USER PROFILE ===
+    @GET("/api/users/me")
+    suspend fun getMyProfile(): Response<UserProfile>
+
+    @PUT("/api/users/me")
+    suspend fun updateMyProfile(
+        @Body request: UpdateProfileRequest
+    ): Response<UserProfile>
+
+    @GET("/api/users/{userId}/profile")
+    suspend fun getUserProfile(
+        @Path("userId") userId: String
+    ): Response<UserProfile>
+
+    @POST("/api/users/{userId}/follow")
+    suspend fun followUser(
+        @Path("userId") userId: String
+    ): Response<FollowResponse>
+
+    @DELETE("/api/users/{userId}/follow")
+    suspend fun unfollowUser(
+        @Path("userId") userId: String
+    ): Response<FollowResponse>
+
+    @GET("/api/users/{userId}/followers")
+    suspend fun getFollowers(
+        @Path("userId") userId: String
+    ): Response<FollowersResponse>
+
+    @GET("/api/users/{userId}/following")
+    suspend fun getFollowing(
+        @Path("userId") userId: String
+    ): Response<FollowingResponse>
 
 }
 

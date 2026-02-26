@@ -213,6 +213,9 @@ class CourseViewModel(
     private val _username = MutableStateFlow("User")  // Default
     val username = _username.asStateFlow()
 
+    val currentUserId: String?
+        get() = userPrefsManager.getUserId()
+
 
     // Update the init block
     init {
@@ -443,14 +446,10 @@ class CourseViewModel(
                     if (response.isSuccessful && response.body() != null) {
                         val data = response.body()!!
 
-                        // FIXED: Check if content exists and is not empty/null
+                        // FIXED: Check if content exists (content is now a typed object, not a string)
                         val hasGeneratedContent = data.units.flatMap { it.subtopics }
                             .any { subtopic ->
-                                subtopic.content != null &&
-                                        subtopic.content != "null" &&
-                                        subtopic.content.isNotEmpty() &&
-                                        subtopic.content != "[]" &&
-                                        subtopic.content != "Content is being generated..."
+                                subtopic.content != null
                             }
 
                         Log.d("POLLING", "Poll $pollCount - Has content: $hasGeneratedContent")
@@ -519,8 +518,9 @@ class CourseViewModel(
 
             val body = requestBody.toRequestBody("application/json".toMediaType())
 
+            val baseUrl = RetrofitClient.BASE_URL.trimEnd('/')
             val request = Request.Builder()
-                .url("${RetrofitClient.BASE_URL}api/courses/$courseId/generate-content-stream")
+                .url("$baseUrl/api/courses/$courseId/generate-content-stream")
                 .post(body)
                 .build()
 

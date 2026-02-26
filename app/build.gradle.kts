@@ -74,6 +74,8 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.runtime.livedata)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
 //    implementation(libs.androidx.room.compiler.processing.testing)
 ////     Add proper Room dependencies if needed
 //     implementation(libs.androidx.room.runtime)
