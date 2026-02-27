@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    const val BASE_URL = "https://b7f1-2405-201-2035-237c-259b-68f0-86d4-710d.ngrok-free.app"
+    const val BASE_URL = "https://e31a-2409-40c1-4110-42-c981-eb22-b803-3180.ngrok-free.app"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -51,5 +51,24 @@ object RetrofitClient {
             .addInterceptor(ChunkedEncodingInterceptor())
             .readTimeout(0, TimeUnit.SECONDS)
             .build()
+    }
+
+    /**
+     * Auth API with extended timeout for long-running operations
+     * (e.g. video manifest generation — 3-5 min of LLM + TTS + image calls)
+     */
+    fun getLongRunningAuthApi(context: Context): ApiService {
+        val longClient = baseOkHttpClient.newBuilder()
+            .addInterceptor(AuthInterceptor(context))
+            .readTimeout(10, TimeUnit.MINUTES)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(longClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
     }
 }

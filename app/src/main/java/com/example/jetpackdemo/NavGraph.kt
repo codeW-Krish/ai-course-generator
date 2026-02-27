@@ -245,6 +245,22 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
+        // === VIDEO PLAYER (subtopic) ===
+        composable("video_player/{subtopicId}/{title}") { backStackEntry ->
+            val subtopicId = backStackEntry.arguments?.getString("subtopicId") ?: return@composable
+            val title = backStackEntry.arguments?.getString("title")
+            val videoRepo = com.example.jetpackdemo.data.repository.VideoRepository(api)
+            val videoFactory = com.example.jetpackdemo.viewmodels.VideoViewModelFactory(videoRepo, context as Application)
+            val videoVm: com.example.jetpackdemo.viewmodels.VideoViewModel = viewModel(factory = videoFactory)
+
+            VideoPlayerScreen(
+                navController = navController,
+                viewModel = videoVm,
+                subtopicId = subtopicId,
+                title = title
+            )
+        }
+
         // === AUDIO OVERVIEW (course) ===
         composable("audio_course/{courseId}/{title}") { backStackEntry ->
             val courseId = backStackEntry.arguments?.getString("courseId") ?: return@composable

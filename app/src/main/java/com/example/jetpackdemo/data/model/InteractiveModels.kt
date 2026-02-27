@@ -279,7 +279,9 @@ data class SubtopicFeatureStatus(
     @SerializedName("has_audio")
     val hasAudio: Boolean = false,
     @SerializedName("has_content")
-    val hasContent: Boolean = false
+    val hasContent: Boolean = false,
+    @SerializedName("has_video")
+    val hasVideo: Boolean = false
 )
 
 data class GeneratedItem(

@@ -53,6 +53,9 @@ import com.example.jetpackdemo.data.model.UpdateProfileRequest
 import com.example.jetpackdemo.data.model.FollowResponse
 import com.example.jetpackdemo.data.model.FollowersResponse
 import com.example.jetpackdemo.data.model.FollowingResponse
+import com.example.jetpackdemo.data.model.GenerateManifestResponse
+import com.example.jetpackdemo.data.model.ManifestStatusResponse
+import com.example.jetpackdemo.data.model.CourseManifestsResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -371,6 +374,40 @@ interface ApiService {
     suspend fun getFollowing(
         @Path("userId") userId: String
     ): Response<FollowingResponse>
+
+    // === VIDEO MANIFEST (Client-Side Playback) ===
+
+    /** Generate presentation manifest for a subtopic (LLM + TTS + assets → CDN) */
+    @POST("/api/videos/{subtopicId}/generate")
+    suspend fun generateVideoManifest(
+        @Path("subtopicId") subtopicId: String,
+        @Query("llm_provider") llmProvider: String? = null,
+        @Query("tts_provider") ttsProvider: String? = null,
+        @Query("voice") voice: String? = null,
+        @Query("image_provider") imageProvider: String? = null
+    ): Response<GenerateManifestResponse>
+
+    /** Get cached manifest or generation status */
+    @GET("/api/videos/{subtopicId}")
+    suspend fun getVideoManifest(
+        @Path("subtopicId") subtopicId: String
+    ): Response<ManifestStatusResponse>
+
+    /** Regenerate manifest (delete cache + regenerate) */
+    @POST("/api/videos/{subtopicId}/regenerate")
+    suspend fun regenerateVideoManifest(
+        @Path("subtopicId") subtopicId: String,
+        @Query("llm_provider") llmProvider: String? = null,
+        @Query("tts_provider") ttsProvider: String? = null,
+        @Query("voice") voice: String? = null,
+        @Query("image_provider") imageProvider: String? = null
+    ): Response<GenerateManifestResponse>
+
+    /** Get all manifest statuses for a course */
+    @GET("/api/videos/course/{courseId}")
+    suspend fun getCourseVideoManifests(
+        @Path("courseId") courseId: String
+    ): Response<CourseManifestsResponse>
 
 }
 
