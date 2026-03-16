@@ -1,8 +1,9 @@
-# UpSkill AI
+<div align="center"> <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=26&pause=1000&color=6366F1&center=true&vCenter=true&width=700&lines=UpSkill+AI+%E2%80%94+Backend;AI+Course+Generation+%2B+Quiz-Gated+Progression;Generates+a+course.+Enforces+you+learn+it." alt="UpSkill AI Backend" /> <br/>
 
-> _"Generates a course. Then enforces that you actually learn it."_
 
-[![Walkthrough](https://img.shields.io/badge/Watch_Walkthrough-FF0000?style=flat&logo=youtube&logoColor=white)](https://your-drive-link-here/) [![Backend](https://img.shields.io/badge/Backend_Repo-181717?style=flat&logo=github&logoColor=white)](https://github.com/codeW-Krish/ai-course-backend) [![Android Client](https://img.shields.io/badge/Android_Client_(Kotlin)-7F52FF?style=flat&logo=kotlin&logoColor=white)](https://github.com/codeW-Krish/ai-course-generator) ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=node.js&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin_Android-7F52FF?style=flat&logo=kotlin&logoColor=white) ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat&logo=firebase&logoColor=black)
+>  _"Generates a course. Then enforces that you actually learn it."_
+>  
+[![Walkthrough](https://img.shields.io/badge/Watch_Walkthrough-FF0000?style=flat&logo=youtube&logoColor=white)](https://drive.google.com/file/d/1j0GkDIAXt97bolGqh5Lt2xljMBJf2hVP/view?usp=drive_link) [![Backend](https://img.shields.io/badge/Backend_Repo-181717?style=flat&logo=github&logoColor=white)](https://github.com/codeW-Krish/ai-course-backend) [![Android Client](https://img.shields.io/badge/Android_Client_(Kotlin)-7F52FF?style=flat&logo=kotlin&logoColor=white)](https://github.com/codeW-Krish/ai-course-generator) ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=node.js&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin_Android-7F52FF?style=flat&logo=kotlin&logoColor=white) ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat&logo=firebase&logoColor=black)
 
 A production-grade AI learning platform that generates structured courses with quizzes, flashcards, audio overviews, and explanation videos — then makes sure you go through them before moving on.
 
