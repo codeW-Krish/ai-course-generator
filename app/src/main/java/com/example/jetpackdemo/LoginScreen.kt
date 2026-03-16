@@ -31,17 +31,20 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.jetpackdemo.data.api.RetrofitClient
 import com.example.jetpackdemo.data.model.LoginRequest
+import com.example.jetpackdemo.shared_pref.UserPreferencesManager
 import com.example.jetpackdemo.ui.theme.AppColors
 import com.example.jetpackdemo.utils.TokenManager
+import com.example.jetpackdemo.viewmodels.CourseViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavHostController) {
+fun LoginScreen(navController: NavHostController, courseViewModel: CourseViewModel) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
@@ -50,6 +53,7 @@ fun LoginScreen(navController: NavHostController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val tokenManager = remember { TokenManager(context) }
+    val userPrefsManager = remember { UserPreferencesManager(context) }  // ← NEW
 
     Scaffold(
         containerColor = AppColors.background,
@@ -74,7 +78,13 @@ fun LoginScreen(navController: NavHostController) {
             verticalArrangement = Arrangement.Center
         ) {
             Text("Welcome Back!", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = AppColors.textPrimary)
-            Text("Log in to continue your learning journey.", fontSize = 16.sp, color = AppColors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 32.dp))
+            Text(
+                "Log in to continue your learning journey.",
+                fontSize = 16.sp,
+                color = AppColors.textSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
+            )
 
             OutlinedTextField(
                 value = email,
@@ -103,9 +113,10 @@ fun LoginScreen(navController: NavHostController) {
                 shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(32.dp))
+
             Button(
                 onClick = {
-                    // Basic Validation
+                    // === BASIC VALIDATION ===
                     if (email.isBlank() || password.isBlank()) {
                         Toast.makeText(context, "Email and password cannot be empty.", Toast.LENGTH_SHORT).show()
                         return@Button
@@ -122,7 +133,24 @@ fun LoginScreen(navController: NavHostController) {
 
                             if (response.isSuccessful) {
                                 val body = response.body()!!
-                                tokenManager.saveTokens(body.accessToken, body.refreshToken)
+
+                                // === SAVE TOKEN (contract-compatible + legacy fallback) ===
+                                val authToken = body.token ?: body.accessToken
+                                if (!authToken.isNullOrBlank()) {
+                                    tokenManager.saveIdToken(authToken)
+                                }
+
+                                // === SAVE USER ROLE (Critical for RBAC) ===
+                                body.user.role?.let { role ->
+                                    userPrefsManager.saveUserRole(role)
+                                } ?: userPrefsManager.saveUserRole("user")
+
+                                val role = userPrefsManager.getUserRole()
+                                userPrefsManager.saveUserData(body.user.id, body.user.username, role, email)
+                                courseViewModel.reloadUserRole()
+                                courseViewModel.reloadUserData()
+
+                                // === NAVIGATE TO MAIN ===
                                 navController.navigate("main") {
                                     popUpTo("welcome") { inclusive = true }
                                 }
@@ -131,10 +159,15 @@ fun LoginScreen(navController: NavHostController) {
                                 val errorMessage = parseErrorMessage(errorBody)
                                 Toast.makeText(context, "Login failed: $errorMessage", Toast.LENGTH_LONG).show()
                             }
-
                         } catch (e: Exception) {
-                            e.message?.let { Log.e("KEY_LOGIN_FAILED", it) };
-                            Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            Log.e("LOGIN_ERROR", "Network failed", e)
+                            val msg = when (e) {
+                                is java.net.UnknownHostException -> "No internet or wrong URL"
+                                is java.net.ConnectException -> "Server not reachable"
+                                is javax.net.ssl.SSLHandshakeException -> "SSL error (ngrok cert)"
+                                else -> e.message ?: "Unknown error"
+                            }
+                            Toast.makeText(context, "Login failed: $msg", Toast.LENGTH_LONG).show()
                         } finally {
                             isLoading = false
                         }
@@ -155,6 +188,7 @@ fun LoginScreen(navController: NavHostController) {
                     Text("Log In", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = AppColors.onPrimary)
                 }
             }
+
             Spacer(modifier = Modifier.height(24.dp))
             SignUpNavigation {
                 navController.navigate("signup")
@@ -183,18 +217,18 @@ private fun SignUpNavigation(onSignUpClicked: () -> Unit) {
         }
     )
 }
+
 fun parseErrorMessage(errorBody: String?): String {
     return try {
-        val json = org.json.JSONObject(errorBody ?: return "Unknown error")
+        val json = JSONObject(errorBody ?: return "Unknown error")
         json.getString("error") ?: "Unknown error"
     } catch (e: Exception) {
         "Something went wrong"
     }
 }
-
-
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    LoginScreen(rememberNavController())
-}
+//
+//@Preview(showBackground = true)
+//@Composable
+//fun LoginScreenPreview() {
+//    LoginScreen(rememberNavController())
+//}

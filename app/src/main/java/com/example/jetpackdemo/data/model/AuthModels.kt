@@ -4,44 +4,71 @@ import com.google.gson.annotations.SerializedName
 data class User(
     val id: String,
     val email: String,
+    val username: String,
+    val role: String = "user" // Add role with default
+)
+
+data class Users(
+    val id: String,
     val username: String
 )
 
-// The complete response from a successful login or register call.
+// AuthResponse remains the same but User now includes role
 data class AuthResponse(
     val message: String,
     val user: User,
-    val accessToken: String,
-    val refreshToken: String
+    @SerializedName("token")
+    val token: String? = null,
+    @SerializedName("accessToken")
+    val accessToken: String? = null,
+    @SerializedName("refreshToken")
+    val refreshToken: String? = null
 )
 
-// The response from a successful token refresh.
-// NOTE: Your backend sends 'newAccessToken' and 'newRefreshToken'.
-// We use @SerializedName to map these to our standard field names.
-// You will need to add the 'com.google.code.gson:gson' dependency for this.
-
-data class RefreshResponse(
+data class RefreshValidationResponse(
     val message: String,
-    @SerializedName("newAccessToken")
-    val accessToken: String,
-    @SerializedName("newRefreshToken")
-    val refreshToken: String
+    val user: User
+)
+
+// Add new data classes for admin features
+data class GlobalSettingsResponse(
+    val settings: List<GlobalSetting>
+)
+
+data class GlobalSetting(
+    val key: String,
+    val value: String,
+    val description: String?,
+    val updated_at: String?
+)
+
+data class AvailableProvidersResponse(
+    val providers: List<String>
+)
+
+data class DefaultProvidersResponse(
+    val outline: String,
+    val content: String
+)
+
+data class UpdateProvidersRequest(
+    val providers: List<String>
+)
+
+data class UpdateDefaultProvidersRequest(
+    val outlineProvider: String,
+    val contentProvider: String
 )
 
 // Data class for the /auth/register endpoint request body.
 data class RegisterRequest(
+    val username: String,
     val email: String,
-    val password: String,
-    val name: String
+    val password: String
 )
 
 // Data class for the /auth/login endpoint request body.
 data class LoginRequest(
     val email: String,
     val password: String
-)
-
-// The request to get a new access token.
-data class RefreshRequest(
-    val refreshToken: String
 )

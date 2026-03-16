@@ -1,0 +1,551 @@
+package com.example.jetpackdemo
+
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.example.jetpackdemo.data.model.InteractiveQuestion
+import com.example.jetpackdemo.data.model.VerifyAnswerResponse
+import com.example.jetpackdemo.ui.theme.AppColors
+import com.example.jetpackdemo.viewmodels.InteractiveViewModel
+import com.example.jetpackdemo.viewmodels.Resource
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun InteractiveLearningScreen(
+    navController: NavController,
+    viewModel: InteractiveViewModel,
+    courseId: String? = null,
+    subtopicId: String? = null
+) {
+    val session by viewModel.session.collectAsState()
+    val currentQuestionIndex by viewModel.currentQuestionIndex.collectAsState()
+    val verifyResult by viewModel.verifyResult.collectAsState()
+    val heartsRemaining by viewModel.heartsRemaining.collectAsState()
+    val selectedAnswer by viewModel.selectedAnswer.collectAsState()
+    val textAnswer by viewModel.textAnswer.collectAsState()
+    val courseCompleted by viewModel.courseCompleted.collectAsState()
+
+    // Load on first composition
+    LaunchedEffect(courseId, subtopicId) {
+        if (session.let { it == null }) {
+            when {
+                courseId != null -> viewModel.loadNextSubtopic(courseId)
+                subtopicId != null -> viewModel.loadSession(subtopicId)
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = AppColors.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    val sessionData = (session as? Resource.Success)?.data
+                    Text(
+                        sessionData?.subtopic?.title ?: "Interactive Learning",
+                        color = AppColors.textPrimary,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        viewModel.clearSession()
+                        navController.popBackStack()
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = AppColors.textPrimary)
+                    }
+                },
+                actions = {
+                    // Hearts display
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        repeat(3) { index ->
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = if (index < heartsRemaining) Color(0xFFEF4444) else Color(0xFFE5E7EB),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        }
+    ) { padding ->
+        when (val state = session) {
+            null -> {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text("Loading...", color = AppColors.textSecondary)
+                }
+            }
+            is Resource.Loading -> {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = AppColors.primary)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Preparing questions...", color = AppColors.textSecondary)
+                        Text("This may take a moment", color = AppColors.textSecondary, fontSize = 12.sp)
+                    }
+                }
+            }
+            is Resource.Error -> {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Warning, "Error", tint = Color(0xFFEF4444), modifier = Modifier.size(48.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text(state.message ?: "Something went wrong", color = AppColors.textSecondary, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                when {
+                                    courseId != null -> viewModel.loadNextSubtopic(courseId)
+                                    subtopicId != null -> viewModel.loadSession(subtopicId)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+                        ) { Text("Retry") }
+                    }
+                }
+            }
+            is Resource.Success -> {
+                val data = state.data ?: return@Scaffold
+
+                if (courseCompleted) {
+                    CourseCompletedView(
+                        onBackToCourses = {
+                            viewModel.clearSession()
+                            navController.popBackStack()
+                        },
+                        modifier = Modifier.padding(padding)
+                    )
+                } else if (data.questions.isEmpty()) {
+                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                        Text("No questions available for this subtopic.", color = AppColors.textSecondary)
+                    }
+                } else {
+                    val question = data.questions.getOrNull(currentQuestionIndex) ?: return@Scaffold
+                    QuestionView(
+                        question = question,
+                        questionNumber = currentQuestionIndex + 1,
+                        totalQuestions = data.questions.size,
+                        selectedAnswer = selectedAnswer,
+                        textAnswer = textAnswer,
+                        verifyResult = verifyResult,
+                        heartsRemaining = heartsRemaining,
+                        onSelectAnswer = { viewModel.selectAnswer(it) },
+                        onTextChanged = { viewModel.setTextAnswer(it) },
+                        onVerify = { viewModel.verifyAnswer() },
+                        onNext = { viewModel.nextQuestion() },
+                        onNextSubtopic = {
+                            if (courseId != null) viewModel.loadNextSubtopic(courseId)
+                        },
+                        onOpenHub = {
+                            val subId = data.subtopic?.id ?: return@QuestionView
+                            val cId = data.subtopic.courseId ?: courseId ?: return@QuestionView
+                            val title = data.subtopic.title
+                            navController.navigate("interactive_hub/$cId/$subId/$title")
+                        },
+                        isLastQuestion = currentQuestionIndex >= data.questions.size - 1,
+                        hasCourseId = courseId != null,
+                        modifier = Modifier.padding(padding)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuestionView(
+    question: InteractiveQuestion,
+    questionNumber: Int,
+    totalQuestions: Int,
+    selectedAnswer: String?,
+    textAnswer: String,
+    verifyResult: Resource<VerifyAnswerResponse>?,
+    heartsRemaining: Int,
+    onSelectAnswer: (String) -> Unit,
+    onTextChanged: (String) -> Unit,
+    onVerify: () -> Unit,
+    onNext: () -> Unit,
+    onNextSubtopic: () -> Unit,
+    onOpenHub: () -> Unit,
+    isLastQuestion: Boolean,
+    hasCourseId: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+    val result = (verifyResult as? Resource.Success)?.data
+    val isAnswered = result != null
+    val isCorrect = result?.correct == true
+    val isGameOver = result?.gameOver == true
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp)
+    ) {
+        // Progress
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Question $questionNumber of $totalQuestions",
+                color = AppColors.textSecondary,
+                fontSize = 14.sp
+            )
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = when (question.type) {
+                    "mcq" -> AppColors.primary.copy(alpha = 0.1f)
+                    else -> Color(0xFFF59E0B).copy(alpha = 0.1f)
+                }
+            ) {
+                Text(
+                    if (question.type == "mcq") "Multiple Choice" else "Fill in the Blank",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    fontSize = 12.sp,
+                    color = if (question.type == "mcq") AppColors.primary else Color(0xFFF59E0B)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { questionNumber.toFloat() / totalQuestions },
+            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+            color = AppColors.primary,
+            trackColor = AppColors.primary.copy(alpha = 0.15f)
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // Question text
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = AppColors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Text(
+                    question.questionText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AppColors.textPrimary,
+                    lineHeight = 26.sp
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Answer options or text input
+        if (question.type == "mcq") {
+            question.options.forEach { option ->
+                val bgColor = when {
+                    isAnswered && isCorrect && option == selectedAnswer -> AppColors.progressGreen.copy(alpha = 0.1f)
+                    isAnswered && !isCorrect && option == selectedAnswer -> Color(0xFFEF4444).copy(alpha = 0.1f)
+                    isAnswered && option == result?.correctAnswer -> AppColors.progressGreen.copy(alpha = 0.1f)
+                    option == selectedAnswer -> AppColors.primary.copy(alpha = 0.08f)
+                    else -> AppColors.surface
+                }
+                val borderColor = when {
+                    isAnswered && isCorrect && option == selectedAnswer -> AppColors.progressGreen
+                    isAnswered && !isCorrect && option == selectedAnswer -> Color(0xFFEF4444)
+                    isAnswered && option == result?.correctAnswer -> AppColors.progressGreen
+                    option == selectedAnswer -> AppColors.primary
+                    else -> Color(0xFFE5E7EB)
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .border(1.5.dp, borderColor, RoundedCornerShape(12.dp))
+                        .clickable(enabled = !isAnswered) { onSelectAnswer(option) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = bgColor),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isAnswered) {
+                            val icon = when {
+                                isCorrect && option == selectedAnswer -> Icons.Default.CheckCircle
+                                !isCorrect && option == selectedAnswer -> Icons.Default.Cancel
+                                option == result?.correctAnswer -> Icons.Default.CheckCircle
+                                else -> null
+                            }
+                            icon?.let {
+                                Icon(
+                                    it, null,
+                                    tint = if (option == result?.correctAnswer || (isCorrect && option == selectedAnswer))
+                                        AppColors.progressGreen else Color(0xFFEF4444),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                            }
+                        }
+                        Text(
+                            option,
+                            color = AppColors.textPrimary,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            // Fill in the blank
+            OutlinedTextField(
+                value = textAnswer,
+                onValueChange = onTextChanged,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isAnswered,
+                label = { Text("Your answer") },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AppColors.primary,
+                    unfocusedBorderColor = Color(0xFFE5E7EB)
+                )
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Result feedback
+        AnimatedVisibility(visible = isAnswered) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isCorrect) AppColors.progressGreen.copy(alpha = 0.08f)
+                    else Color(0xFFEF4444).copy(alpha = 0.08f)
+                )
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (isCorrect) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                            null,
+                            tint = if (isCorrect) AppColors.progressGreen else Color(0xFFEF4444),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (isCorrect) "Correct!" else "Incorrect",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isCorrect) AppColors.progressGreen else Color(0xFFEF4444),
+                            fontSize = 16.sp
+                        )
+                    }
+                    if (!isCorrect && result?.hint != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("💡 ${result.hint}", color = AppColors.textSecondary, fontSize = 14.sp)
+                    }
+                    if (!isCorrect && result?.correctAnswer != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Correct answer: ${result.correctAnswer}", color = AppColors.textSecondary, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        // Game over
+        if (isGameOver) {
+            Spacer(Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2))
+            ) {
+                Column(
+                    Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("💔 Game Over!", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFFEF4444))
+                    Spacer(Modifier.height(8.dp))
+                    Text("You ran out of hearts. But don't worry!", color = AppColors.textSecondary, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = onOpenHub,
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("Study Materials") }
+                        if (hasCourseId) {
+                            Button(
+                                onClick = onNextSubtopic,
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+                            ) { Text("Try Again") }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Action buttons
+        if (!isGameOver) {
+            if (!isAnswered) {
+                Button(
+                    onClick = onVerify,
+                    enabled = (question.type == "mcq" && selectedAnswer != null) ||
+                            (question.type != "mcq" && textAnswer.isNotBlank()),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+                ) {
+                    if (verifyResult is Resource.Loading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Check Answer", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Hub button
+                    OutlinedButton(
+                        onClick = onOpenHub,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Apps, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Hub")
+                    }
+
+                    // Next button
+                    Button(
+                        onClick = {
+                            if (isLastQuestion && hasCourseId) {
+                                onNextSubtopic()
+                            } else if (!isLastQuestion) {
+                                onNext()
+                            }
+                        },
+                        enabled = !isLastQuestion || hasCourseId,
+                        modifier = Modifier.weight(2f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary)
+                    ) {
+                        Text(
+                            if (isLastQuestion && hasCourseId) "Next Topic" else "Next Question",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+
+        // Hint (if answer not yet submitted)
+        if (!isAnswered && question.hint != null) {
+            Spacer(Modifier.height(12.dp))
+            var showHint by remember { mutableStateOf(false) }
+            TextButton(onClick = { showHint = !showHint }) {
+                Icon(Icons.Default.Lightbulb, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (showHint) "Hide Hint" else "Show Hint", color = Color(0xFFF59E0B))
+            }
+            AnimatedVisibility(visible = showHint) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7))
+                ) {
+                    Text(question.hint, modifier = Modifier.padding(12.dp), color = Color(0xFF92400E), fontSize = 14.sp)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun CourseCompletedView(
+    onBackToCourses: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = AppColors.progressGreen.copy(alpha = 0.1f),
+                modifier = Modifier.size(100.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.EmojiEvents,
+                        "Trophy",
+                        tint = Color(0xFFF59E0B),
+                        modifier = Modifier.size(56.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "🎉 Course Completed!",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.textPrimary
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "You've completed all the subtopics in this course. Great job!",
+                color = AppColors.textSecondary,
+                textAlign = TextAlign.Center,
+                fontSize = 16.sp,
+                lineHeight = 24.sp
+            )
+            Spacer(Modifier.height(32.dp))
+            Button(
+                onClick = onBackToCourses,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.primary),
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) {
+                Text("Back to Courses", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
